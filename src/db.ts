@@ -1,6 +1,7 @@
 // AI-GEN-BEGIN
-import type { Env, Post, User } from "./types";
+import type { Category, Env, Post, SiteSettings, User } from "./types";
 import { hashPassword } from "./auth";
+import { normalizeTheme } from "./themes";
 
 export async function ensureBootstrap(env: Env): Promise<void> {
   const row = await env.DB.prepare(
@@ -9,7 +10,10 @@ export async function ensureBootstrap(env: Env): Promise<void> {
     .bind("bootstrapped")
     .first<{ value: string }>();
 
-  if (row?.value === "1") return;
+  if (row?.value === "1") {
+    await ensureDefaultSettings(env.DB);
+    return;
+  }
 
   const exists = await env.DB.prepare("SELECT id FROM users LIMIT 1").first();
   if (!exists) {
@@ -21,10 +25,55 @@ export async function ensureBootstrap(env: Env): Promise<void> {
       .run();
   }
 
+  await ensureDefaultSettings(env.DB);
   await env.DB.prepare(
     "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
   )
     .bind("bootstrapped", "1")
+    .run();
+}
+
+async function ensureDefaultSettings(db: D1Database): Promise<void> {
+  const defaults: [string, string][] = [
+    ["ui_theme", "leuc"],
+    ["weather_effect", "overcast"],
+    ["cursor_effect", "whirlwind"],
+  ];
+  for (const [key, value] of defaults) {
+    await db
+      .prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)")
+      .bind(key, value)
+      .run();
+  }
+}
+
+export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
+  const keys = ["ui_theme", "weather_effect", "cursor_effect"];
+  const map: Record<string, string> = {};
+  for (const key of keys) {
+    const row = await db
+      .prepare("SELECT value FROM settings WHERE key = ?")
+      .bind(key)
+      .first<{ value: string }>();
+    if (row) map[key] = row.value;
+  }
+  return {
+    ui_theme: normalizeTheme(map.ui_theme),
+    weather_effect: map.weather_effect || "overcast",
+    cursor_effect: map.cursor_effect || "whirlwind",
+  };
+}
+
+export async function setSetting(
+  db: D1Database,
+  key: string,
+  value: string
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    )
+    .bind(key, value)
     .run();
 }
 
@@ -40,15 +89,32 @@ export async function findUserByUsername(
   );
 }
 
+const POST_SELECT = `SELECT p.*, c.name AS category_name, c.slug AS category_slug
+  FROM posts p
+  LEFT JOIN categories c ON c.id = p.category_id`;
+
 export async function listPublishedPosts(
   db: D1Database,
-  limit = 50
+  opts: { limit?: number; categoryId?: number | null } = {}
 ): Promise<Post[]> {
+  const limit = opts.limit ?? 100;
+  if (opts.categoryId != null) {
+    const res = await db
+      .prepare(
+        `${POST_SELECT}
+         WHERE p.status = 'published' AND p.category_id = ?
+         ORDER BY COALESCE(p.published_at, p.created_at) DESC
+         LIMIT ?`
+      )
+      .bind(opts.categoryId, limit)
+      .all<Post>();
+    return res.results ?? [];
+  }
   const res = await db
     .prepare(
-      `SELECT * FROM posts
-       WHERE status = 'published'
-       ORDER BY COALESCE(published_at, created_at) DESC
+      `${POST_SELECT}
+       WHERE p.status = 'published'
+       ORDER BY COALESCE(p.published_at, p.created_at) DESC
        LIMIT ?`
     )
     .bind(limit)
@@ -59,8 +125,8 @@ export async function listPublishedPosts(
 export async function listAllPosts(db: D1Database): Promise<Post[]> {
   const res = await db
     .prepare(
-      `SELECT * FROM posts
-       ORDER BY updated_at DESC`
+      `${POST_SELECT}
+       ORDER BY p.updated_at DESC`
     )
     .all<Post>();
   return res.results ?? [];
@@ -72,8 +138,8 @@ export async function getPostBySlug(
   publishedOnly = true
 ): Promise<Post | null> {
   const sql = publishedOnly
-    ? "SELECT * FROM posts WHERE slug = ? AND status = 'published'"
-    : "SELECT * FROM posts WHERE slug = ?";
+    ? `${POST_SELECT} WHERE p.slug = ? AND p.status = 'published'`
+    : `${POST_SELECT} WHERE p.slug = ?`;
   return (await db.prepare(sql).bind(slug).first<Post>()) ?? null;
 }
 
@@ -82,8 +148,10 @@ export async function getPostById(
   id: number
 ): Promise<Post | null> {
   return (
-    (await db.prepare("SELECT * FROM posts WHERE id = ?").bind(id).first<Post>()) ??
-    null
+    (await db
+      .prepare(`${POST_SELECT} WHERE p.id = ?`)
+      .bind(id)
+      .first<Post>()) ?? null
   );
 }
 
@@ -95,14 +163,15 @@ export async function createPost(
     excerpt: string;
     content: string;
     cover_url: string;
+    category_id: number | null;
     status: "draft" | "published";
   }
 ): Promise<number> {
   const publishedAt = data.status === "published" ? new Date().toISOString() : null;
   const res = await db
     .prepare(
-      `INSERT INTO posts (title, slug, excerpt, content, cover_url, status, published_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      `INSERT INTO posts (title, slug, excerpt, content, cover_url, category_id, status, published_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
     )
     .bind(
       data.title,
@@ -110,6 +179,7 @@ export async function createPost(
       data.excerpt,
       data.content,
       data.cover_url,
+      data.category_id,
       data.status,
       publishedAt
     )
@@ -126,6 +196,7 @@ export async function updatePost(
     excerpt: string;
     content: string;
     cover_url: string;
+    category_id: number | null;
     status: "draft" | "published";
   }
 ): Promise<void> {
@@ -136,14 +207,11 @@ export async function updatePost(
   if (data.status === "published" && !publishedAt) {
     publishedAt = new Date().toISOString();
   }
-  if (data.status === "draft") {
-    publishedAt = current.published_at;
-  }
 
   await db
     .prepare(
       `UPDATE posts
-       SET title = ?, slug = ?, excerpt = ?, content = ?, cover_url = ?, status = ?,
+       SET title = ?, slug = ?, excerpt = ?, content = ?, cover_url = ?, category_id = ?, status = ?,
            published_at = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
@@ -153,6 +221,7 @@ export async function updatePost(
       data.excerpt,
       data.content,
       data.cover_url,
+      data.category_id,
       data.status,
       publishedAt,
       id
@@ -160,8 +229,94 @@ export async function updatePost(
     .run();
 }
 
+export async function setPostStatus(
+  db: D1Database,
+  id: number,
+  status: "draft" | "published"
+): Promise<void> {
+  const current = await getPostById(db, id);
+  if (!current) throw new Error("文章不存在");
+  let publishedAt = current.published_at;
+  if (status === "published" && !publishedAt) {
+    publishedAt = new Date().toISOString();
+  }
+  await db
+    .prepare(
+      `UPDATE posts SET status = ?, published_at = ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    .bind(status, publishedAt, id)
+    .run();
+}
+
 export async function deletePost(db: D1Database, id: number): Promise<void> {
   await db.prepare("DELETE FROM posts WHERE id = ?").bind(id).run();
+}
+
+export async function listCategories(db: D1Database): Promise<Category[]> {
+  const res = await db
+    .prepare(
+      `SELECT * FROM categories ORDER BY sort_order ASC, id ASC`
+    )
+    .all<Category>();
+  return res.results ?? [];
+}
+
+export async function getCategoryBySlug(
+  db: D1Database,
+  slug: string
+): Promise<Category | null> {
+  return (
+    (await db
+      .prepare("SELECT * FROM categories WHERE slug = ?")
+      .bind(slug)
+      .first<Category>()) ?? null
+  );
+}
+
+export async function getCategoryById(
+  db: D1Database,
+  id: number
+): Promise<Category | null> {
+  return (
+    (await db
+      .prepare("SELECT * FROM categories WHERE id = ?")
+      .bind(id)
+      .first<Category>()) ?? null
+  );
+}
+
+export async function createCategory(
+  db: D1Database,
+  data: { name: string; slug: string; sort_order: number }
+): Promise<number> {
+  const res = await db
+    .prepare(
+      `INSERT INTO categories (name, slug, sort_order) VALUES (?, ?, ?)`
+    )
+    .bind(data.name, data.slug, data.sort_order)
+    .run();
+  return Number(res.meta.last_row_id);
+}
+
+export async function updateCategory(
+  db: D1Database,
+  id: number,
+  data: { name: string; slug: string; sort_order: number }
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE categories SET name = ?, slug = ?, sort_order = ? WHERE id = ?`
+    )
+    .bind(data.name, data.slug, data.sort_order, id)
+    .run();
+}
+
+export async function deleteCategory(db: D1Database, id: number): Promise<void> {
+  await db
+    .prepare(`UPDATE posts SET category_id = NULL WHERE category_id = ?`)
+    .bind(id)
+    .run();
+  await db.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
 }
 
 export async function updatePassword(

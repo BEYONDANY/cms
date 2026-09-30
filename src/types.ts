@@ -2,6 +2,7 @@
 export type Env = {
   DB: D1Database;
   MEDIA: R2Bucket;
+  SITE: R2Bucket;
   ASSETS: Fetcher;
   AUTH_SECRET?: string;
   SITE_NAME: string;
@@ -15,6 +16,14 @@ export type User = {
   created_at: string;
 };
 
+export type Category = {
+  id: number;
+  name: string;
+  slug: string;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Post = {
   id: number;
   title: string;
@@ -22,10 +31,13 @@ export type Post = {
   excerpt: string;
   content: string;
   cover_url: string;
+  category_id: number | null;
   status: "draft" | "published";
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  category_name?: string | null;
+  category_slug?: string | null;
 };
 
 export type SessionPayload = {
@@ -33,4 +45,20 @@ export type SessionPayload = {
   username: string;
   exp: number;
 };
+
+export type SiteSettings = {
+  ui_theme: string;
+  weather_effect: string;
+  cursor_effect: string;
+};
+
+export type WeatherEffect =
+  | "none"
+  | "snow"
+  | "rain"
+  | "overcast"
+  | "fog"
+  | "wind";
+
+export type CursorEffect = "none" | "whirlwind" | "animal";
 // AI-GEN-END

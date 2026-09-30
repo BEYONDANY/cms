@@ -19,6 +19,11 @@ binding = "MEDIA"
 bucket_name = "cms-media"
 preview_bucket_name = "cms-media"
 
+[[r2_buckets]]
+binding = "SITE"
+bucket_name = "cms-site"
+preview_bucket_name = "cms-site"
+
 [assets]
 directory = "public"
 binding = "ASSETS"
