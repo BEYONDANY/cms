@@ -1,6 +1,6 @@
 // AI-GEN-BEGIN
 import type { Category, Post, SiteSettings } from "../types";
-import { escapeHtml } from "../utils";
+import { escapeHtml, looksLikeHtml, renderMarkdown } from "../utils";
 import {
   CLICK_OPTIONS,
   CURSOR_OPTIONS,
@@ -113,7 +113,9 @@ export function editorPage(
   const title = post?.title ?? "";
   const slug = post?.slug ?? "";
   const excerpt = post?.excerpt ?? "";
-  const content = post?.content ?? "";
+  const rawContent = post?.content ?? "";
+  const content =
+    rawContent && !looksLikeHtml(rawContent) ? renderMarkdown(rawContent) : rawContent;
   const cover = post?.cover_url ?? "";
   const status = post?.status ?? "draft";
   const categoryId = post?.category_id ?? null;
@@ -131,19 +133,26 @@ export function editorPage(
     siteName,
     username,
     settings,
+    headExtra: `<!-- AI-GEN-BEGIN -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@7.6.1/tinymce.min.js" referrerpolicy="origin"></script>
+<!-- AI-GEN-END -->`,
+    bodyExtra: `<!-- AI-GEN-BEGIN -->
+<script src="/static/editor.js" defer></script>
+<!-- AI-GEN-END -->`,
     body: `<section class="card">
       <h1>${isNew ? "写文章" : "编辑文章"}</h1>
       ${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}
-      <form method="post" action="${action}" class="stack editor" enctype="multipart/form-data">
+      <form method="post" action="${action}" class="stack editor" enctype="multipart/form-data" id="post-editor-form">
         <label>标题<input name="title" required value="${escapeHtml(title)}" /></label>
         <label>Slug（可空，自动生成）<input name="slug" value="${escapeHtml(slug)}" placeholder="my-post" /></label>
         <label>分类<select name="category_id">${catOptions}</select></label>
         <label>摘要<textarea name="excerpt" rows="2">${escapeHtml(excerpt)}</textarea></label>
         <label>封面 URL<input name="cover_url" value="${escapeHtml(cover)}" placeholder="https://... 或先上传" /></label>
         <label>上传封面（≤2MB）<input type="file" name="cover_file" accept="image/*" /></label>
-        <label>正文（Markdown）
-          <textarea name="content" rows="18" required>${escapeHtml(content)}</textarea>
+        <label>正文（富文本）
+          <textarea id="post-content" name="content" rows="18">${escapeHtml(content)}</textarea>
         </label>
+        <p class="muted tip">图片可本地上传（≤2MB）；视频 / 音频请用工具栏「媒体」粘贴外链（B站、YouTube、直链）。</p>
         <label>状态
           <select name="status">
             <option value="draft" ${status === "draft" ? "selected" : ""}>草稿</option>

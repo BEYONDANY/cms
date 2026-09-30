@@ -9,6 +9,8 @@ export function layout(opts: {
   nav?: string;
   settings?: SiteSettings;
   admin?: boolean;
+  headExtra?: string;
+  bodyExtra?: string;
 }): string {
   const nav = opts.nav ?? "";
   const title =
@@ -23,6 +25,8 @@ export function layout(opts: {
   const fxAttrs = opts.admin
     ? ""
     : ` data-weather="${escapeHtml(weather)}" data-cursor="${escapeHtml(cursor)}" data-click="${escapeHtml(click)}"`;
+  const headExtra = opts.headExtra || "";
+  const bodyExtra = opts.bodyExtra || "";
 
   return `<!DOCTYPE html>
 <html lang="zh-CN" data-theme="${escapeHtml(theme)}">
@@ -34,6 +38,7 @@ export function layout(opts: {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
+  ${headExtra}
 </head>
 <body${fxAttrs}>
   <div id="fx-layer" aria-hidden="true"></div>
@@ -48,6 +53,7 @@ export function layout(opts: {
     <div class="wrap">BeyondAny</div>
   </footer>
   ${opts.admin ? "" : `<script src="/static/effects.js" defer></script>`}
+  ${bodyExtra}
 </body>
 </html>`;
 }
@@ -58,6 +64,8 @@ export function adminLayout(opts: {
   username?: string;
   body: string;
   settings?: SiteSettings;
+  headExtra?: string;
+  bodyExtra?: string;
 }): string {
   const nav = opts.username
     ? `<a href="/x/admin">发布</a>
@@ -78,6 +86,8 @@ export function adminLayout(opts: {
     body: opts.body,
     settings: opts.settings,
     admin: true,
+    headExtra: opts.headExtra,
+    bodyExtra: opts.bodyExtra,
   });
 }
 // AI-GEN-END

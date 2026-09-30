@@ -28,7 +28,7 @@ import {
   updatePost,
 } from "./db";
 import { normalizeTheme } from "./themes";
-import { slugify } from "./utils";
+import { sanitizePostHtml, slugify } from "./utils";
 import {
   clientIp,
   rateLimit,
@@ -263,8 +263,15 @@ app.get("/x/admin/posts/:id", requireAuth, async (c) => {
   return c.html(editorPage(c.env.SITE_NAME, session.username, post, categories, s));
 });
 
-/** 封面上限 2MB，避免 R2 存储与流量失控 */
+/** 封面 / 正文图片上限 2MB，避免 R2 存储与流量失控 */
 const MAX_COVER_BYTES = 2 * 1024 * 1024;
+const MAX_INLINE_IMAGE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
 
 async function uploadCover(env: Env, file: File | undefined): Promise<string | null> {
   // AI-GEN-BEGIN
@@ -276,6 +283,39 @@ async function uploadCover(env: Env, file: File | undefined): Promise<string | n
   const key = `covers/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   await env.MEDIA.put(key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type || "application/octet-stream" },
+  });
+  return `/media/${key}`;
+  // AI-GEN-END
+}
+
+async function uploadInlineImage(env: Env, file: File | undefined): Promise<string> {
+  // AI-GEN-BEGIN
+  if (!file || typeof file === "string" || file.size === 0) {
+    throw new Error("请选择图片文件");
+  }
+  if (file.size > MAX_INLINE_IMAGE_BYTES) {
+    throw new Error("图片不能超过 2MB（控制 R2 免费额度）");
+  }
+  const type = (file.type || "").toLowerCase();
+  if (type && !ALLOWED_IMAGE_TYPES.has(type)) {
+    throw new Error("仅支持 JPG / PNG / GIF / WebP");
+  }
+  const extFromName = (file.name.split(".").pop() || "").toLowerCase();
+  const ext =
+    extFromName && ["jpg", "jpeg", "png", "gif", "webp"].includes(extFromName)
+      ? extFromName === "jpeg"
+        ? "jpg"
+        : extFromName
+      : type === "image/png"
+        ? "png"
+        : type === "image/gif"
+          ? "gif"
+          : type === "image/webp"
+            ? "webp"
+            : "jpg";
+  const key = `posts/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  await env.MEDIA.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: type || `image/${ext === "jpg" ? "jpeg" : ext}` },
   });
   return `/media/${key}`;
   // AI-GEN-END
@@ -306,6 +346,19 @@ app.get("/media/*", async (c) => {
   // AI-GEN-END
 });
 
+app.post("/x/admin/media", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  try {
+    const body = await c.req.parseBody();
+    const url = await uploadInlineImage(c.env, body.file as File | undefined);
+    return c.json({ ok: true, url });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "上传失败";
+    return c.json({ ok: false, error: msg }, 400);
+  }
+  // AI-GEN-END
+});
+
 app.post("/x/admin/posts", requireAuth, async (c) => {
   const session = c.get("session");
   const s = await settings(c);
@@ -313,7 +366,7 @@ app.post("/x/admin/posts", requireAuth, async (c) => {
   const body = await c.req.parseBody();
   const title = String(body.title || "").trim();
   const excerpt = String(body.excerpt || "").trim();
-  const content = String(body.content || "");
+  const content = sanitizePostHtml(String(body.content || ""));
   const status = body.status === "published" ? "published" : "draft";
   const category_id = parseCategoryId(body.category_id);
   let slug = String(body.slug || "").trim() || slugify(title);
@@ -328,7 +381,7 @@ app.post("/x/admin/posts", requireAuth, async (c) => {
         400
       );
     }
-    const id = await createPost(c.env.DB, {
+    await createPost(c.env.DB, {
       title,
       slug,
       excerpt,
@@ -337,7 +390,7 @@ app.post("/x/admin/posts", requireAuth, async (c) => {
       category_id,
       status,
     });
-    return c.redirect(`/x/admin/posts/${id}`);
+    return c.redirect("/x/admin");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
     return c.html(
@@ -360,7 +413,7 @@ app.post("/x/admin/posts/:id", requireAuth, async (c) => {
   const body = await c.req.parseBody();
   const title = String(body.title || "").trim();
   const excerpt = String(body.excerpt || "").trim();
-  const content = String(body.content || "");
+  const content = sanitizePostHtml(String(body.content || ""));
   const status = body.status === "published" ? "published" : "draft";
   const category_id = parseCategoryId(body.category_id);
   let slug = String(body.slug || "").trim() || slugify(title);
@@ -378,7 +431,7 @@ app.post("/x/admin/posts/:id", requireAuth, async (c) => {
       category_id,
       status,
     });
-    return c.redirect(`/x/admin/posts/${id}`);
+    return c.redirect("/x/admin");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
     return c.html(
@@ -387,7 +440,6 @@ app.post("/x/admin/posts/:id", requireAuth, async (c) => {
     );
   }
 });
-
 app.post("/x/admin/posts/:id/status", requireAuth, async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.parseBody();

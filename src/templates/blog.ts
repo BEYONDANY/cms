@@ -1,6 +1,6 @@
 // AI-GEN-BEGIN
 import type { Category, Post, SiteSettings } from "../types";
-import { escapeHtml, renderMarkdown } from "../utils";
+import { escapeHtml, renderPostContent } from "../utils";
 import { layout } from "./layout";
 
 function formatDate(iso: string | null): string {
@@ -116,7 +116,7 @@ export function postPage(
   post: Post,
   settings: SiteSettings
 ): string {
-  const html = renderMarkdown(post.content);
+  const html = renderPostContent(post.content);
   const cover = post.cover_url
     ? `<div class="post-hero-cover" style="background-image:url('${escapeHtml(post.cover_url)}')"></div>`
     : "";
