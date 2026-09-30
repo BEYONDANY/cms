@@ -120,6 +120,9 @@ export function layout(opts: {
     ? `<script src="/static/city-widgets.js" defer></script>`
     : "";
   const wrapCls = homeWide ? "wrap wrap--home" : "wrap";
+  const bodyClass = [isHome ? "page-home" : "", opts.admin ? "page-admin" : ""]
+    .filter(Boolean)
+    .join(" ");
 
   return `<!DOCTYPE html>
 <html lang="zh-CN" data-theme="${escapeHtml(theme)}">
@@ -133,9 +136,9 @@ export function layout(opts: {
   <link rel="stylesheet" href="/static/style.css" />
   ${headExtra}
 </head>
-<body${fxAttrs}${isHome ? ' class="page-home"' : ""}>
-  <div id="fx-layer" aria-hidden="true"></div>
-  <header class="site-header${homeShell ? " site-header--home" : ""}">
+<body${fxAttrs}${bodyClass ? ` class="${bodyClass}"` : ""}>
+  ${opts.admin ? "" : `<div id="fx-layer" aria-hidden="true"></div>`}
+  <header class="site-header${homeShell ? " site-header--home" : ""}${opts.admin ? " site-header--admin" : ""}">
     <div class="${wrapCls} header-inner">
       <a class="brand" href="/">${escapeHtml(opts.siteName)}</a>
       ${navHtml}
@@ -168,7 +171,10 @@ export function adminLayout(opts: {
        <a href="/x/admin/usage">用量</a>
        <a href="/x/admin/settings">外观</a>
        <a href="/x/admin/password">改密</a>
-       <a href="/">前台</a>
+       <form class="inline" method="post" action="/x/admin/rebuild">
+         <button type="submit" class="linkish">整站更新</button>
+       </form>
+       <a href="/" target="_blank" rel="noopener">前台</a>
        <form class="inline" method="post" action="/x/admin/logout">
          <button type="submit" class="linkish">退出(${escapeHtml(opts.username)})</button>
        </form>`

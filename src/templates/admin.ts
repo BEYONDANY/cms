@@ -194,7 +194,8 @@ export function categoriesPage(
   username: string,
   categories: Category[],
   settings: SiteSettings,
-  error = ""
+  error = "",
+  message = ""
 ): string {
   const rows =
     categories.length === 0
@@ -227,6 +228,7 @@ export function categoriesPage(
     settings,
     body: `<section>
       <div class="toolbar"><h1>分类管理</h1></div>
+      ${message ? `<p class="ok">${escapeHtml(message)}</p>` : ""}
       ${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}
       <div class="card">
         <h2 class="subhead">新建分类</h2>
@@ -251,7 +253,8 @@ export function usagePage(
   siteName: string,
   username: string,
   settings: SiteSettings,
-  snap: UsageSnapshot
+  snap: UsageSnapshot,
+  message = ""
 ): string {
   // AI-GEN-BEGIN
   const level = (p: number) =>
@@ -332,6 +335,7 @@ export function usagePage(
           </form>
         </div>
       </div>
+      ${message ? `<p class="ok">${escapeHtml(message)}</p>` : ""}
       <p class="muted tip">${meta} · 对照 Free 额度，非账单金额</p>
       ${snap.error ? `<p class="error">${escapeHtml(snap.error)}</p>` : ""}
       ${setup}

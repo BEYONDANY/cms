@@ -247,14 +247,28 @@ app.get("/x/admin/usage", requireAuth, async (c) => {
     return c.redirect("/x/admin/usage");
   }
   const snap = await getUsageSnapshot(c.env, { force: false });
-  return c.html(usagePage(c.env.SITE_NAME, session.username, s, snap));
+  const msg = c.req.query("msg") || "";
+  return c.html(usagePage(c.env.SITE_NAME, session.username, s, snap, msg));
   // AI-GEN-END
 });
 
 app.post("/x/admin/rebuild", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
   const result = await generateSite(c.env);
   const msg = `整站更新完成：写入 ${result.pages} 页，清理 ${result.deleted} 个旧文件`;
-  return c.redirect(`/x/admin?msg=${encodeURIComponent(msg)}`);
+  const referer = c.req.header("referer") || "";
+  let back = "/x/admin";
+  try {
+    const u = new URL(referer);
+    if (u.pathname.startsWith("/x/admin")) {
+      back = u.pathname;
+    }
+  } catch {
+    // ignore
+  }
+  const sep = back.includes("?") ? "&" : "?";
+  return c.redirect(`${back}${sep}msg=${encodeURIComponent(msg)}`);
+  // AI-GEN-END
 });
 
 async function maybeRebuildSite(env: Env): Promise<void> {
@@ -528,7 +542,10 @@ app.get("/x/admin/categories", requireAuth, async (c) => {
   const session = c.get("session");
   const s = await settings(c);
   const categories = await listCategories(c.env.DB);
-  return c.html(categoriesPage(c.env.SITE_NAME, session.username, categories, s));
+  const msg = c.req.query("msg") || "";
+  return c.html(
+    categoriesPage(c.env.SITE_NAME, session.username, categories, s, "", msg)
+  );
 });
 
 app.post("/x/admin/categories", requireAuth, async (c) => {
@@ -584,7 +601,8 @@ app.post("/x/admin/categories/:id/delete", requireAuth, async (c) => {
 app.get("/x/admin/settings", requireAuth, async (c) => {
   const session = c.get("session");
   const s = await settings(c);
-  return c.html(settingsPage(c.env.SITE_NAME, session.username, s));
+  const msg = c.req.query("msg") || "";
+  return c.html(settingsPage(c.env.SITE_NAME, session.username, s, msg));
 });
 
 app.post("/x/admin/settings", requireAuth, async (c) => {
@@ -727,7 +745,8 @@ app.post("/x/admin/banners/:id/down", requireAuth, async (c) => {
 app.get("/x/admin/password", requireAuth, async (c) => {
   const session = c.get("session");
   const s = await settings(c);
-  return c.html(passwordPage(c.env.SITE_NAME, session.username, s));
+  const msg = c.req.query("msg") || "";
+  return c.html(passwordPage(c.env.SITE_NAME, session.username, s, msg));
 });
 
 app.post("/x/admin/password", requireAuth, async (c) => {
