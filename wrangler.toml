@@ -11,6 +11,10 @@ SITE_NAME = "BeyondAny"
 SITE_URL = "https://beyondany.com"
 # Turnstile 站点钥（公开）；密钥用：npx wrangler secret put TURNSTILE_SECRET_KEY
 TURNSTILE_SITE_KEY = "0x4AAAAAAFJ9BeUGGdWAObnt"
+# 用量看板（Token 用 secret：npx wrangler secret put CF_API_TOKEN）
+CF_ACCOUNT_ID = "ba8dfe72787ba341a3047b8249268878"
+CF_WORKER_NAME = "beyondany-cms"
+CF_D1_DATABASE_ID = "d6471bb1-479d-40de-b7a1-911e0fc3829c"
 
 [[d1_databases]]
 binding = "DB"

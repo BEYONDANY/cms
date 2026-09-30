@@ -299,6 +299,20 @@ main {
   margin: 1rem 0; background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 .editor .tox-tinymce { border-radius: calc(var(--radius) * 0.7); border-color: var(--line) !important; }
+.usage-board { display: grid; gap: 1.15rem; }
+.usage-meter-head {
+  display: flex; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  margin-bottom: 0.4rem; font-size: 0.92rem;
+}
+.usage-bar {
+  height: 0.55rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent); overflow: hidden;
+}
+.usage-bar i { display: block; height: 100%; border-radius: inherit; background: var(--ok, #16a34a); }
+.usage-bar i.warn { background: #d97706; }
+.usage-bar i.danger { background: var(--danger); }
+.usage-steps { margin: 0.5rem 0 0; padding-left: 1.2rem; line-height: 1.7; }
+.usage-steps code { font-size: 0.85em; }
 /* AI-GEN-END */
 .back-link { margin-top: 2.5rem; }
 .empty { text-align: center; padding: 4rem 0; }
@@ -438,5 +452,94 @@ html[data-theme="ink"] .ladder-card:hover { transform: none; }
   .ladder-cover { min-height: 140px; aspect-ratio: 16 / 9; }
   .header-inner { flex-direction: column; align-items: flex-start; }
   .timeline-group { grid-template-columns: 18px 1fr; gap: 0.75rem; }
+}
+
+/* ===== 首页：左天气 / 中内容 / 右限行 ===== */
+.wrap--home { width: min(1280px, calc(100% - 2rem)); }
+.home-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 220px;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1.25rem 0 2rem;
+}
+.home-main { min-width: 0; }
+.city-panel {
+  position: sticky;
+  top: 4.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 0.9rem 0.85rem;
+}
+.city-panel-head h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.city-panel-head .muted { margin: 0.2rem 0 0; font-size: 0.75rem; }
+.weather-now {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin: 0.85rem 0 0.75rem; padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.weather-now-temp {
+  font-size: 2.1rem; font-weight: 700; line-height: 1;
+  font-family: var(--display); color: var(--accent);
+}
+.weather-now-meta { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+.weather-now-meta span { color: var(--muted); font-size: 0.75rem; }
+.city-list { display: grid; gap: 0.35rem; }
+.city-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 0.5rem; padding: 0.4rem 0.35rem; border-radius: 8px;
+  font-size: 0.82rem;
+}
+.city-row.is-today {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.city-row-meta { display: grid; gap: 0.1rem; min-width: 0; }
+.city-row-meta strong { font-weight: 650; }
+.city-row-meta span { color: var(--muted); font-size: 0.72rem; }
+.weather-temps { display: flex; gap: 0.4rem; font-variant-numeric: tabular-nums; }
+.weather-temps .tmax { font-weight: 650; }
+.weather-temps .tmin { color: var(--muted); }
+.plate-today {
+  margin: 0.85rem 0 0.75rem; padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line); text-align: center;
+}
+.plate-today-label { margin: 0 0 0.45rem; color: var(--muted); font-size: 0.78rem; }
+.plate-free-lg {
+  margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--accent-2);
+}
+.plate-digits { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+.plate-digits--lg { justify-content: center; gap: 0.45rem; }
+.plate-digit {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.55rem; height: 1.55rem; padding: 0 0.3rem;
+  border-radius: 6px; font-weight: 700; font-size: 0.9rem;
+  background: var(--accent); color: var(--accent-ink);
+}
+.plate-digits--lg .plate-digit {
+  min-width: 2.2rem; height: 2.2rem; font-size: 1.25rem; border-radius: 10px;
+}
+.plate-and { color: var(--muted); font-size: 0.8rem; }
+.plate-free {
+  color: var(--accent-2); font-weight: 650; font-size: 0.82rem;
+}
+.city-note { margin: 0.75rem 0 0; font-size: 0.68rem; line-height: 1.4; }
+
+@media (max-width: 1100px) {
+  .home-layout {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .home-main { grid-column: 1 / -1; order: -1; }
+  .city-panel { position: static; }
+}
+@media (max-width: 640px) {
+  .home-layout { grid-template-columns: 1fr; }
 }
 /* AI-GEN-END */

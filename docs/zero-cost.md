@@ -38,6 +38,18 @@
 - 「整站更新」会写 R2，别脚本狂刷  
 - 流量暴涨当天访问可能被 Free 日限额挡住 —— 这是预期的 $0 保护
 
+## 用量看板（后台「用量」）
+
+路径：`/x/admin/usage`（GraphQL Analytics，缓存约 15 分钟）
+
+```bash
+# 创建 Token：Account Analytics Read（建议再加 D1 Read）
+npx wrangler secret put CF_API_TOKEN
+# CF_ACCOUNT_ID / CF_WORKER_NAME / CF_D1_DATABASE_ID 已在 wrangler.toml [vars]
+```
+
+本地可在 `.dev.vars` 写 `CF_API_TOKEN=...`（勿提交）。
+
 ## 验证命令
 
 ```bash

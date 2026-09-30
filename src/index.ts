@@ -50,7 +50,9 @@ import {
   loginPage,
   passwordPage,
   settingsPage,
+  usagePage,
 } from "./templates/admin";
+import { getUsageSnapshot } from "./usage";
 
 type AppVars = {
   Variables: {
@@ -230,6 +232,20 @@ app.get("/x/admin", requireAuth, async (c) => {
   const posts = await listAllPosts(c.env.DB);
   const msg = c.req.query("msg") || "";
   return c.html(dashboardPage(c.env.SITE_NAME, session.username, posts, s, msg));
+});
+
+app.get("/x/admin/usage", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const session = c.get("session");
+  const s = await settings(c);
+  const force = c.req.query("refresh") === "1";
+  if (force) {
+    await getUsageSnapshot(c.env, { force: true });
+    return c.redirect("/x/admin/usage");
+  }
+  const snap = await getUsageSnapshot(c.env, { force: false });
+  return c.html(usagePage(c.env.SITE_NAME, session.username, s, snap));
+  // AI-GEN-END
 });
 
 app.post("/x/admin/rebuild", requireAuth, async (c) => {

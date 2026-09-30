@@ -2,6 +2,12 @@
 import type { Category, Post, SiteSettings } from "../types";
 import { escapeHtml, looksLikeHtml, renderMarkdown } from "../utils";
 import {
+  formatBytes,
+  formatCount,
+  meterPercent,
+  type UsageSnapshot,
+} from "../usage";
+import {
   CLICK_OPTIONS,
   CURSOR_OPTIONS,
   UI_THEMES,
@@ -239,6 +245,101 @@ export function categoriesPage(
       </div>
     </section>`,
   });
+}
+
+export function usagePage(
+  siteName: string,
+  username: string,
+  settings: SiteSettings,
+  snap: UsageSnapshot
+): string {
+  // AI-GEN-BEGIN
+  const level = (p: number) =>
+    p >= 90 ? "danger" : p >= 70 ? "warn" : "ok";
+
+  const meters =
+    snap.meters.length === 0
+      ? `<p class="muted">暂无用量数据。</p>`
+      : snap.meters
+          .map((m) => {
+            const p = meterPercent(m);
+            const used =
+              m.unit === "bytes" ? formatBytes(m.used) : formatCount(m.used);
+            const limit =
+              m.unit === "bytes" ? formatBytes(m.limit) : formatCount(m.limit);
+            return `<div class="usage-meter">
+              <div class="usage-meter-head">
+                <strong>${escapeHtml(m.label)}</strong>
+                <span>${escapeHtml(used)} / ${escapeHtml(limit)}（${p}%）</span>
+              </div>
+              <div class="usage-bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100">
+                <i class="${level(p)}" style="width:${p}%"></i>
+              </div>
+              ${m.hint ? `<p class="muted tip">${escapeHtml(m.hint)}</p>` : ""}
+            </div>`;
+          })
+          .join("");
+
+  const buckets =
+    snap.details?.r2Buckets?.length
+      ? `<div class="card" style="margin-top:1rem">
+          <h2 class="subhead">R2 分桶</h2>
+          <table>
+            <thead><tr><th>桶</th><th>对象</th><th>大小</th></tr></thead>
+            <tbody>
+              ${snap.details.r2Buckets
+                .map(
+                  (b) => `<tr>
+                  <td><code>${escapeHtml(b.name)}</code></td>
+                  <td>${b.objects}</td>
+                  <td>${escapeHtml(formatBytes(b.bytes))}</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>`
+      : "";
+
+  const setup = !snap.configured
+    ? `<div class="card">
+        <h2 class="subhead">配置 API Token</h2>
+        <ol class="usage-steps">
+          <li>打开 <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">API Tokens</a> → Create Token</li>
+          <li>权限建议：Account · Account Analytics · Read；Account · D1 · Read（可选）</li>
+          <li>本地/生产执行：<code>npx wrangler secret put CF_API_TOKEN</code></li>
+          <li><code>CF_ACCOUNT_ID</code> 已在 wrangler.toml vars 中配置</li>
+        </ol>
+      </div>`
+    : "";
+
+  const meta = `更新于 ${escapeHtml((snap.fetchedAt || "").replace("T", " ").slice(0, 19))} UTC${
+    snap.cached ? " · 缓存" : " · 实时"
+  }`;
+
+  return adminLayout({
+    title: "用量看板",
+    siteName,
+    username,
+    settings,
+    body: `<section>
+      <div class="toolbar">
+        <h1>Cloudflare 用量</h1>
+        <div class="toolbar-actions">
+          <form method="get" action="/x/admin/usage" class="inline">
+            <input type="hidden" name="refresh" value="1" />
+            <button type="submit" class="btn secondary">刷新</button>
+          </form>
+        </div>
+      </div>
+      <p class="muted tip">${meta} · 对照 Free 额度，非账单金额</p>
+      ${snap.error ? `<p class="error">${escapeHtml(snap.error)}</p>` : ""}
+      ${setup}
+      <div class="card usage-board">${meters}</div>
+      ${buckets}
+    </section>`,
+  });
+  // AI-GEN-END
 }
 
 export function settingsPage(

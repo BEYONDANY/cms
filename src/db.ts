@@ -71,6 +71,19 @@ export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
   };
 }
 
+export async function getSetting(
+  db: D1Database,
+  key: string
+): Promise<string | null> {
+  // AI-GEN-BEGIN
+  const row = await db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .bind(key)
+    .first<{ value: string }>();
+  return row?.value ?? null;
+  // AI-GEN-END
+}
+
 export async function setSetting(
   db: D1Database,
   key: string,

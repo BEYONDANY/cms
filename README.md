@@ -5,7 +5,7 @@
 ## 功能
 
 - 前台：封面天梯时间轴、分类筛选、Markdown 详情
-- 后台：发布管理（列表快捷改状态）、分类管理、外观设置
+- 后台：发布管理（列表快捷改状态）、分类管理、用量看板、外观设置
 - LEUC 对齐 12 套主题可切换
 - 首页氛围特效（雪/雨/阴天/雾/风）与鼠标跟随（小旋风/动物残影）
 - 封面图上传到 R2、修改管理员密码
@@ -39,7 +39,10 @@ npm run dev
 
 ```
 AUTH_SECRET=replace-with-a-long-random-string
+CF_API_TOKEN=your-cloudflare-api-token
 ```
+
+用量看板：`/x/admin/usage`（需 `CF_API_TOKEN`，权限见 `docs/zero-cost.md`）
 
 ## 部署到 Cloudflare（beyondany.com）
 

@@ -10,6 +10,14 @@ export type Env = {
   /** Turnstile 站点钥（可公开）；密钥走 TURNSTILE_SECRET_KEY */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
+  /** Cloudflare 用量看板：Account ID（可放 vars） */
+  CF_ACCOUNT_ID?: string;
+  /** Cloudflare API Token（Secret，需 Analytics Read，建议含 D1 Read） */
+  CF_API_TOKEN?: string;
+  /** 统计的 Worker 脚本名，默认 beyondany-cms */
+  CF_WORKER_NAME?: string;
+  /** D1 database UUID，用于读 file_size */
+  CF_D1_DATABASE_ID?: string;
 };
 
 export type User = {

@@ -71,6 +71,7 @@ export function adminLayout(opts: {
     ? `<a href="/x/admin">发布</a>
        <a href="/x/admin/posts/new">写文章</a>
        <a href="/x/admin/categories">分类</a>
+       <a href="/x/admin/usage">用量</a>
        <a href="/x/admin/settings">外观</a>
        <a href="/x/admin/password">改密</a>
        <a href="/">前台</a>
