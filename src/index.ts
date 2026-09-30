@@ -30,6 +30,12 @@ import {
 import { normalizeTheme } from "./themes";
 import { slugify } from "./utils";
 import {
+  clientIp,
+  rateLimit,
+  rateLimitedHtml,
+  verifyTurnstile,
+} from "./security";
+import {
   generateSite,
   serveSiteNotFound,
   serveSiteOrBootstrap,
@@ -53,6 +59,10 @@ type AppVars = {
 const app = new Hono<{ Bindings: Env } & AppVars>();
 const COOKIE = "cms_session";
 
+function turnstileSiteKey(env: Env): string {
+  return (env.TURNSTILE_SITE_KEY || "").trim();
+}
+
 async function requireAuth(c: any, next: () => Promise<void>) {
   const token = getCookie(c, COOKIE);
   const secret = authSecret(c.env.AUTH_SECRET);
@@ -72,6 +82,7 @@ async function settings(c: { env: Env }): Promise<SiteSettings> {
       ui_theme: "leuc",
       weather_effect: "overcast",
       cursor_effect: "whirlwind",
+      click_effect: "water",
     };
   }
 }
@@ -83,6 +94,39 @@ app.use("*", async (c, next) => {
     // 本地未 migrate 时先放行
   }
   await next();
+});
+
+// 全站软限流：每 IP 每分钟 300 次，减轻 Free 日配额被刷穿
+app.use("*", async (c, next) => {
+  // AI-GEN-BEGIN
+  const path = c.req.path;
+  if (path.startsWith("/static/")) {
+    await next();
+    return;
+  }
+  const ip = clientIp(c.req.raw);
+  const limited = await rateLimit("site", ip, 300, 60);
+  if (!limited.ok) return rateLimitedHtml(limited.retryAfter);
+  await next();
+  // AI-GEN-END
+});
+
+// 后台更严：每 IP 每分钟 90 次
+app.use("/x/admin", async (c, next) => {
+  // AI-GEN-BEGIN
+  const ip = clientIp(c.req.raw);
+  const limited = await rateLimit("admin", ip, 90, 60);
+  if (!limited.ok) return rateLimitedHtml(limited.retryAfter);
+  await next();
+  // AI-GEN-END
+});
+app.use("/x/admin/*", async (c, next) => {
+  // AI-GEN-BEGIN
+  const ip = clientIp(c.req.raw);
+  const limited = await rateLimit("admin", ip, 90, 60);
+  if (!limited.ok) return rateLimitedHtml(limited.retryAfter);
+  await next();
+  // AI-GEN-END
 });
 
 app.get("/static/*", async (c) => {
@@ -123,17 +167,39 @@ app.get("/x/admin/login", async (c) => {
   if (token && (await verifySessionToken(token, secret))) {
     return c.redirect("/x/admin");
   }
-  return c.html(loginPage(c.env.SITE_NAME, s));
+  return c.html(loginPage(c.env.SITE_NAME, s, "", turnstileSiteKey(c.env)));
 });
 
 app.post("/x/admin/login", async (c) => {
+  // AI-GEN-BEGIN
   const s = await settings(c);
+  const ip = clientIp(c.req.raw);
+  // 登录更严：15 分钟内最多 8 次
+  const limited = await rateLimit("login", ip, 8, 15 * 60);
+  if (!limited.ok) return rateLimitedHtml(limited.retryAfter);
+
   const body = await c.req.parseBody();
   const username = String(body.username || "").trim();
   const password = String(body.password || "");
+  const cfToken = String(body["cf-turnstile-response"] || "");
+
+  const turnstileSecret = (c.env.TURNSTILE_SECRET_KEY || "").trim();
+  if (turnstileSecret) {
+    const ts = await verifyTurnstile(cfToken, turnstileSecret, ip);
+    if (!ts.ok) {
+      return c.html(
+        loginPage(c.env.SITE_NAME, s, ts.message, turnstileSiteKey(c.env)),
+        400
+      );
+    }
+  }
+
   const user = await findUserByUsername(c.env.DB, username);
   if (!user || !(await verifyPassword(password, user.password_hash))) {
-    return c.html(loginPage(c.env.SITE_NAME, s, "用户名或密码错误"), 401);
+    return c.html(
+      loginPage(c.env.SITE_NAME, s, "用户名或密码错误", turnstileSiteKey(c.env)),
+      401
+    );
   }
   const secret = authSecret(c.env.AUTH_SECRET);
   const token = await createSessionToken(
@@ -148,6 +214,7 @@ app.post("/x/admin/login", async (c) => {
     maxAge: 60 * 60 * 24 * 7,
   });
   return c.redirect("/x/admin");
+  // AI-GEN-END
 });
 
 app.post("/x/admin/logout", requireAuth, async (c) => {
@@ -404,15 +471,25 @@ app.post("/x/admin/settings", requireAuth, async (c) => {
   const theme = normalizeTheme(String(body.ui_theme || "leuc"));
   const weather = String(body.weather_effect || "none");
   const cursor = String(body.cursor_effect || "none");
+  const click = String(body.click_effect || "none");
   const weatherOk = ["none", "snow", "rain", "overcast", "fog", "wind"].includes(weather);
   const cursorOk = ["none", "whirlwind", "animal"].includes(cursor);
+  const clickOk = ["none", "water", "boom", "glass", "nuke"].includes(click);
 
   await setSetting(c.env.DB, "ui_theme", theme);
   await setSetting(c.env.DB, "weather_effect", weatherOk ? weather : "none");
   await setSetting(c.env.DB, "cursor_effect", cursorOk ? cursor : "none");
+  await setSetting(c.env.DB, "click_effect", clickOk ? click : "none");
+
+  // 外观改动立即刷新静态站，避免前台仍是旧特效配置
+  try {
+    await generateSite(c.env);
+  } catch {
+    // 生成失败不阻断保存
+  }
 
   const s = await settings(c);
-  return c.html(settingsPage(c.env.SITE_NAME, session.username, s, "设置已保存"));
+  return c.html(settingsPage(c.env.SITE_NAME, session.username, s, "设置已保存并已更新静态站"));
 });
 
 app.get("/x/admin/password", requireAuth, async (c) => {

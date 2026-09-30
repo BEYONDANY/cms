@@ -19,9 +19,10 @@ export function layout(opts: {
   const theme = opts.settings?.ui_theme || "leuc";
   const weather = opts.settings?.weather_effect || "none";
   const cursor = opts.settings?.cursor_effect || "none";
+  const click = opts.settings?.click_effect || "none";
   const fxAttrs = opts.admin
     ? ""
-    : ` data-weather="${escapeHtml(weather)}" data-cursor="${escapeHtml(cursor)}"`;
+    : ` data-weather="${escapeHtml(weather)}" data-cursor="${escapeHtml(cursor)}" data-click="${escapeHtml(click)}"`;
 
   return `<!DOCTYPE html>
 <html lang="zh-CN" data-theme="${escapeHtml(theme)}">
@@ -44,7 +45,7 @@ export function layout(opts: {
   </header>
   <main class="wrap">${opts.body}</main>
   <footer class="site-footer">
-    <div class="wrap">BeyondAny · Cloudflare</div>
+    <div class="wrap">BeyondAny</div>
   </footer>
   ${opts.admin ? "" : `<script src="/static/effects.js" defer></script>`}
 </body>

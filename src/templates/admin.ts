@@ -1,14 +1,27 @@
 // AI-GEN-BEGIN
 import type { Category, Post, SiteSettings } from "../types";
 import { escapeHtml } from "../utils";
-import { CURSOR_OPTIONS, UI_THEMES, WEATHER_OPTIONS } from "../themes";
+import {
+  CLICK_OPTIONS,
+  CURSOR_OPTIONS,
+  UI_THEMES,
+  WEATHER_OPTIONS,
+} from "../themes";
 import { adminLayout } from "./layout";
 
 export function loginPage(
   siteName: string,
   settings: SiteSettings,
-  error = ""
+  error = "",
+  turnstileSiteKey = ""
 ): string {
+  // AI-GEN-BEGIN
+  const turnstile = turnstileSiteKey
+    ? `<div class="cf-turnstile" data-sitekey="${escapeHtml(turnstileSiteKey)}" data-theme="auto"></div>
+       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
+    : `<p class="muted tip">未配置 Turnstile，生产环境请设置 TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY。</p>`;
+  // AI-GEN-END
+
   return adminLayout({
     title: "登录",
     siteName,
@@ -19,6 +32,7 @@ export function loginPage(
       <form method="post" action="/x/admin/login" class="stack">
         <label>用户名<input name="username" required autocomplete="username" /></label>
         <label>密码<input name="password" type="password" required autocomplete="current-password" /></label>
+        ${turnstile}
         <button type="submit">登录</button>
       </form>
       <p class="muted tip">默认账号 admin / admin123，登录后请改密。</p>
@@ -228,6 +242,11 @@ export function settingsPage(
       `<option value="${o.id}" ${settings.cursor_effect === o.id ? "selected" : ""}>${o.name}</option>`
   ).join("");
 
+  const clickOpts = CLICK_OPTIONS.map(
+    (o) =>
+      `<option value="${o.id}" ${settings.click_effect === o.id ? "selected" : ""}>${o.name}</option>`
+  ).join("");
+
   return adminLayout({
     title: "外观设置",
     siteName,
@@ -249,6 +268,9 @@ export function settingsPage(
           </label>
           <label style="margin-top:0.8rem;display:grid;gap:0.35rem">鼠标跟随
             <select name="cursor_effect">${cursorOpts}</select>
+          </label>
+          <label style="margin-top:0.8rem;display:grid;gap:0.35rem">鼠标点击
+            <select name="click_effect">${clickOpts}</select>
           </label>
         </div>
         <div class="row">

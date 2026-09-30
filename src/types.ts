@@ -7,6 +7,9 @@ export type Env = {
   AUTH_SECRET?: string;
   SITE_NAME: string;
   SITE_URL: string;
+  /** Turnstile 站点钥（可公开）；密钥走 TURNSTILE_SECRET_KEY */
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
 };
 
 export type User = {
@@ -50,6 +53,7 @@ export type SiteSettings = {
   ui_theme: string;
   weather_effect: string;
   cursor_effect: string;
+  click_effect: string;
 };
 
 export type WeatherEffect =
@@ -61,4 +65,11 @@ export type WeatherEffect =
   | "wind";
 
 export type CursorEffect = "none" | "whirlwind" | "animal";
+
+export type ClickEffect =
+  | "none"
+  | "water"
+  | "boom"
+  | "glass"
+  | "nuke";
 // AI-GEN-END

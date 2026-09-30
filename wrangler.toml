@@ -7,8 +7,10 @@ compatibility_flags = ["nodejs_compat"]
 # 费用策略：保持 Workers Free（勿升 Paid）；勿加 Cron/Logpush/[limits]；R2 勿开公网域名
 # 详见 docs/zero-cost.md
 [vars]
-SITE_NAME = "BeyondAny Blog"
+SITE_NAME = "BeyondAny"
 SITE_URL = "https://beyondany.com"
+# Turnstile 站点钥（公开）；密钥用：npx wrangler secret put TURNSTILE_SECRET_KEY
+TURNSTILE_SITE_KEY = "0x4AAAAAAFJ9BeUGGdWAObnt"
 
 [[d1_databases]]
 binding = "DB"

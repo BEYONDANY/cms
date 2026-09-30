@@ -38,6 +38,7 @@ async function ensureDefaultSettings(db: D1Database): Promise<void> {
     ["ui_theme", "leuc"],
     ["weather_effect", "overcast"],
     ["cursor_effect", "whirlwind"],
+    ["click_effect", "water"],
   ];
   for (const [key, value] of defaults) {
     await db
@@ -48,7 +49,12 @@ async function ensureDefaultSettings(db: D1Database): Promise<void> {
 }
 
 export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
-  const keys = ["ui_theme", "weather_effect", "cursor_effect"];
+  const keys = [
+    "ui_theme",
+    "weather_effect",
+    "cursor_effect",
+    "click_effect",
+  ];
   const map: Record<string, string> = {};
   for (const key of keys) {
     const row = await db
@@ -61,6 +67,7 @@ export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
     ui_theme: normalizeTheme(map.ui_theme),
     weather_effect: map.weather_effect || "overcast",
     cursor_effect: map.cursor_effect || "whirlwind",
+    click_effect: map.click_effect || "water",
   };
 }
 

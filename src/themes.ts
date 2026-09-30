@@ -38,6 +38,14 @@ export const CURSOR_OPTIONS = [
   { id: "animal", name: "动物滑动残影" },
 ] as const;
 
+export const CLICK_OPTIONS = [
+  { id: "none", name: "关闭" },
+  { id: "water", name: "水滴" },
+  { id: "boom", name: "波音冲击" },
+  { id: "glass", name: "玻璃破碎" },
+  { id: "nuke", name: "原子弹爆破" },
+] as const;
+
 export function normalizeTheme(id: string | null | undefined): string {
   return id && UI_THEME_IDS.has(id) ? id : "leuc";
 }
