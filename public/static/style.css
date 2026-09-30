@@ -123,23 +123,36 @@ html[data-theme="antd"] {
 
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
+html {
+  background-color: var(--bg);
+  color-scheme: inherit;
+}
 body {
   color: var(--ink);
-  background:
+  background-color: var(--bg);
+  background-image:
     radial-gradient(1000px 480px at 8% -10%, var(--body-a) 0%, transparent 55%),
-    radial-gradient(900px 420px at 100% 0%, var(--body-b) 0%, transparent 50%),
-    var(--bg);
+    radial-gradient(900px 420px at 100% 0%, var(--body-b) 0%, transparent 50%);
+  background-attachment: fixed;
   font-family: var(--font);
   line-height: 1.65;
   position: relative;
+  transition: color 0.25s ease, background-color 0.25s ease;
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 #fx-layer, #fx-canvas {
-  position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  position: fixed; inset: 0; pointer-events: none !important; z-index: 1;
 }
 #fx-canvas { width: 100%; height: 100%; }
+.site-header,
+.wrap,
+.site-footer,
+main {
+  position: relative;
+  z-index: 2;
+}
 
 .wrap { width: min(980px, calc(100% - 2rem)); margin: 0 auto; }
 .site-header {
@@ -344,6 +357,14 @@ th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
 .badge.published { background: color-mix(in srgb, var(--accent-2) 25%, transparent); color: var(--accent-2); }
 .badge.draft { color: var(--muted); }
 .actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+/* AI-GEN-BEGIN */
+.drag-cell { width: 2rem; color: var(--muted); user-select: none; }
+.drag-handle { cursor: grab; font-size: 1.1rem; letter-spacing: -0.1em; }
+tr.dragging { opacity: 0.55; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+tr.drag-over { outline: 1px dashed var(--accent); }
+tbody#post-sort-body tr[data-id] { cursor: grab; }
+tbody#post-sort-body tr[data-id]:active { cursor: grabbing; }
+/* AI-GEN-END */
 .row, .form-inline { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 .inline { display: inline; margin: 0; }
 .inline-edit { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
@@ -354,21 +375,39 @@ code { font-family: var(--mono); font-size: 0.85em; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 0.75rem;
+  position: relative;
+  z-index: 2;
 }
 .theme-card {
-  display: grid; gap: 0.25rem; padding: 0.75rem;
+  position: relative;
+  display: grid; gap: 0.35rem; padding: 0.75rem;
   border: 1px solid var(--line); border-radius: var(--radius);
   cursor: pointer; background: color-mix(in srgb, var(--card) 70%, transparent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  user-select: none;
 }
-.theme-card.active, .theme-card:hover {
+.theme-card:hover { transform: translateY(-1px); }
+.theme-card.active, .theme-card:has(input:checked) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
-.theme-card input { position: absolute; opacity: 0; pointer-events: none; }
+/* 整卡可点：radio 铺满卡片 */
+.theme-card input[type="radio"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+  pointer-events: auto;
+}
 .theme-swatch {
-  height: 36px; border-radius: calc(var(--radius) * 0.5);
+  height: 40px; border-radius: calc(var(--radius) * 0.5);
   border: 1px solid var(--line);
   background: linear-gradient(120deg, var(--sw-a, #1863dc), var(--sw-b, #00b48a));
+  pointer-events: none;
 }
 .theme-swatch[data-preview="leuc"] { --sw-a: #1863dc; --sw-b: #00b48a; }
 .theme-swatch[data-preview="github-light"] { --sw-a: #0969da; --sw-b: #1a7f37; }
@@ -382,8 +421,8 @@ code { font-family: var(--mono); font-size: 0.85em; }
 .theme-swatch[data-preview="rose"] { --sw-a: #fce7f3; --sw-b: #db2777; }
 .theme-swatch[data-preview="ink"] { --sw-a: #000; --sw-b: #fff; }
 .theme-swatch[data-preview="antd"] { --sw-a: #001529; --sw-b: #1677ff; }
-.theme-name { font-weight: 650; font-size: 0.92rem; }
-.theme-desc { font-size: 0.78rem; color: var(--muted); }
+.theme-name { font-weight: 650; font-size: 0.92rem; pointer-events: none; }
+.theme-desc { font-size: 0.78rem; color: var(--muted); pointer-events: none; }
 
 html[data-theme="neon"] body {
   animation: neonPulse 2.4s ease-in-out infinite alternate;

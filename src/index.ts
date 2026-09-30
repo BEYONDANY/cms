@@ -14,6 +14,7 @@ import {
   createPost,
   deleteCategory,
   deletePost,
+  duplicatePost,
   ensureBootstrap,
   findUserByUsername,
   getCategoryById,
@@ -21,6 +22,7 @@ import {
   getSiteSettings,
   listAllPosts,
   listCategories,
+  reorderPosts,
   setPostStatus,
   setSetting,
   updateCategory,
@@ -236,6 +238,14 @@ app.post("/x/admin/rebuild", requireAuth, async (c) => {
   return c.redirect(`/x/admin?msg=${encodeURIComponent(msg)}`);
 });
 
+async function maybeRebuildSite(env: Env): Promise<void> {
+  try {
+    await generateSite(env);
+  } catch {
+    // 静态生成失败不阻断后台写库
+  }
+}
+
 app.get("/x/admin/posts/:id/preview", requireAuth, async (c) => {
   const s = await settings(c);
   const id = Number(c.req.param("id"));
@@ -390,6 +400,7 @@ app.post("/x/admin/posts", requireAuth, async (c) => {
       category_id,
       status,
     });
+    if (status === "published") await maybeRebuildSite(c.env);
     return c.redirect("/x/admin");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
@@ -398,6 +409,26 @@ app.post("/x/admin/posts", requireAuth, async (c) => {
       400
     );
   }
+});
+
+app.post("/x/admin/posts/reorder", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  try {
+    const body = await c.req.json<{ ids?: unknown }>();
+    const ids = Array.isArray(body.ids)
+      ? body.ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
+      : [];
+    if (ids.length === 0) {
+      return c.json({ ok: false, error: "缺少排序 id" }, 400);
+    }
+    await reorderPosts(c.env.DB, ids);
+    await maybeRebuildSite(c.env);
+    return c.json({ ok: true, rebuilt: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "排序失败";
+    return c.json({ ok: false, error: msg }, 400);
+  }
+  // AI-GEN-END
 });
 
 app.post("/x/admin/posts/:id", requireAuth, async (c) => {
@@ -431,6 +462,10 @@ app.post("/x/admin/posts/:id", requireAuth, async (c) => {
       category_id,
       status,
     });
+    // 已发布或从发布改为草稿：刷新前台
+    if (status === "published" || existing.status === "published") {
+      await maybeRebuildSite(c.env);
+    }
     return c.redirect("/x/admin");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
@@ -440,17 +475,33 @@ app.post("/x/admin/posts/:id", requireAuth, async (c) => {
     );
   }
 });
+
+app.post("/x/admin/posts/:id/copy", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const id = Number(c.req.param("id"));
+  try {
+    const newId = await duplicatePost(c.env.DB, id);
+    return c.redirect(`/x/admin/posts/${newId}`);
+  } catch {
+    return c.redirect("/x/admin?msg=" + encodeURIComponent("复制失败"));
+  }
+  // AI-GEN-END
+});
+
 app.post("/x/admin/posts/:id/status", requireAuth, async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.parseBody();
   const status = body.status === "published" ? "published" : "draft";
   await setPostStatus(c.env.DB, id, status);
+  await maybeRebuildSite(c.env);
   return c.redirect("/x/admin");
 });
 
 app.post("/x/admin/posts/:id/delete", requireAuth, async (c) => {
   const id = Number(c.req.param("id"));
+  const existing = await getPostById(c.env.DB, id);
   await deletePost(c.env.DB, id);
+  if (existing?.status === "published") await maybeRebuildSite(c.env);
   return c.redirect("/x/admin");
 });
 

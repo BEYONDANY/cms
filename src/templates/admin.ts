@@ -49,17 +49,22 @@ export function dashboardPage(
 ): string {
   const rows =
     posts.length === 0
-      ? `<tr><td colspan="5" class="muted">还没有文章</td></tr>`
+      ? `<tr><td colspan="6" class="muted">还没有文章</td></tr>`
       : posts
           .map((p) => {
             const next = p.status === "published" ? "draft" : "published";
             const nextLabel = p.status === "published" ? "设为草稿" : "发布";
-            return `<tr>
+            return `<tr data-id="${p.id}">
+            <td class="drag-cell" title="拖拽排序"><span class="drag-handle" aria-hidden="true">⠿</span></td>
             <td><a href="/x/admin/posts/${p.id}">${escapeHtml(p.title)}</a></td>
             <td>${escapeHtml(p.category_name || "未分类")}</td>
             <td><span class="badge ${p.status}">${p.status === "published" ? "已发布" : "草稿"}</span></td>
             <td>${escapeHtml((p.updated_at || "").slice(0, 16))}</td>
             <td class="actions">
+              <a href="/x/admin/posts/${p.id}">编辑</a>
+              <form method="post" action="/x/admin/posts/${p.id}/copy" class="inline">
+                <button type="submit" class="linkish">复制</button>
+              </form>
               <form method="post" action="/x/admin/posts/${p.id}/status" class="inline">
                 <input type="hidden" name="status" value="${next}" />
                 <button type="submit" class="linkish">${nextLabel}</button>
@@ -78,6 +83,7 @@ export function dashboardPage(
     siteName,
     username,
     settings,
+    bodyExtra: `<script src="/static/admin-posts.js" defer></script>`,
     body: `<section>
       <div class="toolbar">
         <h1>发布管理</h1>
@@ -89,11 +95,12 @@ export function dashboardPage(
         </div>
       </div>
       ${message ? `<p class="ok">${escapeHtml(message)}</p>` : ""}
-      <p class="muted tip">单篇「发布」只改数据库状态；前台静态页需点「整站更新」后才会刷新。</p>
+      <p id="sort-ok" class="ok" hidden></p>
+      <p class="muted tip">拖拽左侧把手调整顺序（与前台天梯一致）。已发布文章可直接点「编辑」修改；发布/改序/保存已发布内容会自动更新静态站。「复制」生成新草稿。</p>
       <div class="card table-wrap">
-        <table>
-          <thead><tr><th>标题</th><th>分类</th><th>状态</th><th>更新</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
+        <table class="post-table">
+          <thead><tr><th class="drag-cell"></th><th>标题</th><th>分类</th><th>状态</th><th>更新</th><th></th></tr></thead>
+          <tbody id="post-sort-body">${rows}</tbody>
         </table>
       </div>
     </section>`,
@@ -159,11 +166,19 @@ export function editorPage(
             <option value="published" ${status === "published" ? "selected" : ""}>发布</option>
           </select>
         </label>
+        <p class="muted tip">已发布文章可直接修改后保存，将自动刷新前台静态页。</p>
         <div class="row">
           <button type="submit">保存</button>
           <a class="btn ghost" href="/x/admin">返回列表</a>
         </div>
       </form>
+      ${
+        post?.id
+          ? `<form method="post" action="/x/admin/posts/${post.id}/copy" class="row" style="margin-top:0.75rem">
+               <button type="submit" class="btn secondary">复制为草稿</button>
+             </form>`
+          : ""
+      }
     </section>`,
   });
 }

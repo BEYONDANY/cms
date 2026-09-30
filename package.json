@@ -10,6 +10,8 @@
     "db:migrate:remote": "wrangler d1 execute cms-db --remote --file=./schema.sql",
     "db:migrate:v2:local": "wrangler d1 execute cms-db --local --file=./migrations/002_categories_themes.sql",
     "db:migrate:v2:remote": "wrangler d1 execute cms-db --remote --file=./migrations/002_categories_themes.sql",
+    "db:migrate:v3:local": "wrangler d1 execute cms-db --local --file=./migrations/003_posts_sort_order.sql",
+    "db:migrate:v3:remote": "wrangler d1 execute cms-db --remote --file=./migrations/003_posts_sort_order.sql",
     "cf:typegen": "wrangler types"
   },
   "dependencies": {

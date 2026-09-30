@@ -36,6 +36,7 @@ export type Post = {
   cover_url: string;
   category_id: number | null;
   status: "draft" | "published";
+  sort_order: number;
   published_at: string | null;
   created_at: string;
   updated_at: string;

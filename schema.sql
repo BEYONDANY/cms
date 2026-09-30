@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS posts (
   cover_url TEXT NOT NULL DEFAULT '',
   category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
   published_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -33,6 +34,9 @@ CREATE INDEX IF NOT EXISTS idx_posts_status_published
 
 CREATE INDEX IF NOT EXISTS idx_posts_category
   ON posts (category_id);
+
+CREATE INDEX IF NOT EXISTS idx_posts_sort_order
+  ON posts (sort_order ASC, id ASC);
 
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,

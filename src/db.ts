@@ -100,6 +100,8 @@ const POST_SELECT = `SELECT p.*, c.name AS category_name, c.slug AS category_slu
   FROM posts p
   LEFT JOIN categories c ON c.id = p.category_id`;
 
+const POST_ORDER = `ORDER BY p.sort_order ASC, p.id ASC`;
+
 export async function listPublishedPosts(
   db: D1Database,
   opts: { limit?: number; categoryId?: number | null } = {}
@@ -110,7 +112,7 @@ export async function listPublishedPosts(
       .prepare(
         `${POST_SELECT}
          WHERE p.status = 'published' AND p.category_id = ?
-         ORDER BY COALESCE(p.published_at, p.created_at) DESC
+         ${POST_ORDER}
          LIMIT ?`
       )
       .bind(opts.categoryId, limit)
@@ -121,7 +123,7 @@ export async function listPublishedPosts(
     .prepare(
       `${POST_SELECT}
        WHERE p.status = 'published'
-       ORDER BY COALESCE(p.published_at, p.created_at) DESC
+       ${POST_ORDER}
        LIMIT ?`
     )
     .bind(limit)
@@ -131,12 +133,38 @@ export async function listPublishedPosts(
 
 export async function listAllPosts(db: D1Database): Promise<Post[]> {
   const res = await db
-    .prepare(
-      `${POST_SELECT}
-       ORDER BY p.updated_at DESC`
-    )
+    .prepare(`${POST_SELECT} ${POST_ORDER}`)
     .all<Post>();
   return res.results ?? [];
+}
+
+async function nextSortOrder(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare("SELECT COALESCE(MIN(sort_order), 0) AS m FROM posts")
+    .first<{ m: number }>();
+  return (row?.m ?? 0) - 1;
+}
+
+export async function uniquePostSlug(
+  db: D1Database,
+  base: string,
+  excludeId?: number
+): Promise<string> {
+  let slug = base || "post";
+  for (let i = 0; i < 50; i++) {
+    const candidate = i === 0 ? slug : `${slug}-${i + 1}`;
+    const row = excludeId
+      ? await db
+          .prepare("SELECT id FROM posts WHERE slug = ? AND id != ?")
+          .bind(candidate, excludeId)
+          .first()
+      : await db
+          .prepare("SELECT id FROM posts WHERE slug = ?")
+          .bind(candidate)
+          .first();
+    if (!row) return candidate;
+  }
+  return `${slug}-${Date.now().toString(36)}`;
 }
 
 export async function getPostBySlug(
@@ -175,19 +203,22 @@ export async function createPost(
   }
 ): Promise<number> {
   const publishedAt = data.status === "published" ? new Date().toISOString() : null;
+  const sortOrder = await nextSortOrder(db);
+  const slug = await uniquePostSlug(db, data.slug);
   const res = await db
     .prepare(
-      `INSERT INTO posts (title, slug, excerpt, content, cover_url, category_id, status, published_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      `INSERT INTO posts (title, slug, excerpt, content, cover_url, category_id, status, sort_order, published_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
     )
     .bind(
       data.title,
-      data.slug,
+      slug,
       data.excerpt,
       data.content,
       data.cover_url,
       data.category_id,
       data.status,
+      sortOrder,
       publishedAt
     )
     .run();
@@ -257,6 +288,42 @@ export async function setPostStatus(
 
 export async function deletePost(db: D1Database, id: number): Promise<void> {
   await db.prepare("DELETE FROM posts WHERE id = ?").bind(id).run();
+}
+
+/** 按 ids 顺序重写 sort_order（0..n-1），同步前后台排序 */
+export async function reorderPosts(
+  db: D1Database,
+  ids: number[]
+): Promise<void> {
+  if (ids.length === 0) return;
+  const stmts = ids.map((id, index) =>
+    db
+      .prepare(
+        `UPDATE posts SET sort_order = ?, updated_at = datetime('now') WHERE id = ?`
+      )
+      .bind(index, id)
+  );
+  await db.batch(stmts);
+}
+
+/** 复制为新草稿，标题加「（副本）」，slug 自动去重 */
+export async function duplicatePost(
+  db: D1Database,
+  id: number
+): Promise<number> {
+  const src = await getPostById(db, id);
+  if (!src) throw new Error("文章不存在");
+  const title = `${src.title}（副本）`;
+  const baseSlug = `${src.slug}-copy`;
+  return createPost(db, {
+    title,
+    slug: baseSlug,
+    excerpt: src.excerpt,
+    content: src.content,
+    cover_url: src.cover_url,
+    category_id: src.category_id,
+    status: "draft",
+  });
 }
 
 export async function listCategories(db: D1Database): Promise<Category[]> {
