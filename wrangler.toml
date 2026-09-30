@@ -4,6 +4,8 @@ compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
 # 本地开发时用 vars；生产请在 Dashboard / wrangler secret 设置 AUTH_SECRET
+# 费用策略：保持 Workers Free（勿升 Paid）；勿加 Cron/Logpush/[limits]；R2 勿开公网域名
+# 详见 docs/zero-cost.md
 [vars]
 SITE_NAME = "BeyondAny Blog"
 SITE_URL = "https://beyondany.com"

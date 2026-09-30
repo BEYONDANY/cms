@@ -69,24 +69,53 @@ export async function generateSite(env: Env): Promise<GenerateSiteResult> {
   return { pages: wanted.size, deleted };
 }
 
+type CacheCtx = {
+  request: Request;
+  waitUntil: (p: Promise<unknown>) => void;
+};
+
+async function withEdgeCache(
+  ctx: CacheCtx | undefined,
+  build: () => Promise<Response | null>
+): Promise<Response | null> {
+  // AI-GEN-BEGIN
+  if (ctx) {
+    const hit = await caches.default.match(ctx.request);
+    if (hit) return hit;
+  }
+  const res = await build();
+  if (res && ctx && (res.status === 200 || res.status === 404)) {
+    ctx.waitUntil(caches.default.put(ctx.request, res.clone()));
+  }
+  return res;
+  // AI-GEN-END
+}
+
 export async function serveSiteHtml(
   bucket: R2Bucket,
   key: string,
-  status = 200
+  status = 200,
+  cacheCtx?: CacheCtx
 ): Promise<Response | null> {
-  const obj = await bucket.get(key);
-  if (!obj) return null;
-  const headers = new Headers();
-  obj.writeHttpMetadata(headers);
-  if (!headers.has("content-type")) {
-    headers.set("content-type", "text/html; charset=utf-8");
-  }
-  headers.set("cache-control", "public, max-age=60");
-  return new Response(obj.body, { status, headers });
+  return withEdgeCache(cacheCtx, async () => {
+    const obj = await bucket.get(key);
+    if (!obj) return null;
+    const headers = new Headers();
+    obj.writeHttpMetadata(headers);
+    if (!headers.has("content-type")) {
+      headers.set("content-type", "text/html; charset=utf-8");
+    }
+    // 短缓存：省 Worker 请求与 R2 读；发文重建后最多约 1 分钟旧页
+    headers.set("cache-control", "public, max-age=60");
+    return new Response(obj.body, { status, headers });
+  });
 }
 
-export async function serveSiteNotFound(bucket: R2Bucket): Promise<Response> {
-  const fallback = await serveSiteHtml(bucket, "404.html", 404);
+export async function serveSiteNotFound(
+  bucket: R2Bucket,
+  cacheCtx?: CacheCtx
+): Promise<Response> {
+  const fallback = await serveSiteHtml(bucket, "404.html", 404, cacheCtx);
   if (fallback) return fallback;
   return new Response("Not Found", {
     status: 404,
@@ -96,10 +125,35 @@ export async function serveSiteNotFound(bucket: R2Bucket): Promise<Response> {
 
 export async function serveSiteOr404(
   bucket: R2Bucket,
-  key: string
+  key: string,
+  cacheCtx?: CacheCtx
 ): Promise<Response> {
-  const page = await serveSiteHtml(bucket, key);
+  const page = await serveSiteHtml(bucket, key, 200, cacheCtx);
   if (page) return page;
-  return serveSiteNotFound(bucket);
+  return serveSiteNotFound(bucket, cacheCtx);
+}
+
+/**
+ * 前台读静态页；若整站尚未生成（无 index.html）则自动全量 regenerate 一次。
+ * 正常 404（已有站点但缺某页）不会打 D1。
+ */
+export async function serveSiteOrBootstrap(
+  env: Env,
+  key: string,
+  cacheCtx?: CacheCtx
+): Promise<Response> {
+  // AI-GEN-BEGIN
+  const page = await serveSiteHtml(env.SITE, key, 200, cacheCtx);
+  if (page) return page;
+
+  const bootstrapped = await env.SITE.head("index.html");
+  if (!bootstrapped) {
+    await generateSite(env);
+    const generated = await serveSiteHtml(env.SITE, key, 200, cacheCtx);
+    if (generated) return generated;
+  }
+
+  return serveSiteNotFound(env.SITE, cacheCtx);
+  // AI-GEN-END
 }
 // AI-GEN-END

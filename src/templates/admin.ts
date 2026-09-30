@@ -126,7 +126,7 @@ export function editorPage(
         <label>分类<select name="category_id">${catOptions}</select></label>
         <label>摘要<textarea name="excerpt" rows="2">${escapeHtml(excerpt)}</textarea></label>
         <label>封面 URL<input name="cover_url" value="${escapeHtml(cover)}" placeholder="https://... 或先上传" /></label>
-        <label>上传封面<input type="file" name="cover_file" accept="image/*" /></label>
+        <label>上传封面（≤2MB）<input type="file" name="cover_file" accept="image/*" /></label>
         <label>正文（Markdown）
           <textarea name="content" rows="18" required>${escapeHtml(content)}</textarea>
         </label>

@@ -29,7 +29,11 @@ import {
 } from "./db";
 import { normalizeTheme } from "./themes";
 import { slugify } from "./utils";
-import { generateSite, serveSiteNotFound, serveSiteOr404 } from "./static-site";
+import {
+  generateSite,
+  serveSiteNotFound,
+  serveSiteOrBootstrap,
+} from "./static-site";
 import { notFoundPage, postPage } from "./templates/blog";
 import {
   categoriesPage,
@@ -85,17 +89,31 @@ app.get("/static/*", async (c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
-// 前台只读 SITE R2 预渲染 HTML，不查 D1
-app.get("/", async (c) => serveSiteOr404(c.env.SITE, "index.html"));
+function edgeCacheCtx(c: {
+  req: { raw: Request };
+  executionCtx: { waitUntil: (p: Promise<unknown>) => void };
+}) {
+  // AI-GEN-BEGIN
+  return {
+    request: c.req.raw,
+    waitUntil: (p: Promise<unknown>) => c.executionCtx.waitUntil(p),
+  };
+  // AI-GEN-END
+}
+
+// 前台读 SITE R2；桶为空时自动整站生成一次；边缘缓存降低 Free 日请求与 R2 读
+app.get("/", async (c) =>
+  serveSiteOrBootstrap(c.env, "index.html", edgeCacheCtx(c))
+);
 
 app.get("/category/:slug", async (c) => {
   const slug = c.req.param("slug");
-  return serveSiteOr404(c.env.SITE, `category/${slug}.html`);
+  return serveSiteOrBootstrap(c.env, `category/${slug}.html`, edgeCacheCtx(c));
 });
 
 app.get("/post/:slug", async (c) => {
   const slug = c.req.param("slug");
-  return serveSiteOr404(c.env.SITE, `post/${slug}.html`);
+  return serveSiteOrBootstrap(c.env, `post/${slug}.html`, edgeCacheCtx(c));
 });
 
 app.get("/x/admin/login", async (c) => {
@@ -178,14 +196,22 @@ app.get("/x/admin/posts/:id", requireAuth, async (c) => {
   return c.html(editorPage(c.env.SITE_NAME, session.username, post, categories, s));
 });
 
+/** 封面上限 2MB，避免 R2 存储与流量失控 */
+const MAX_COVER_BYTES = 2 * 1024 * 1024;
+
 async function uploadCover(env: Env, file: File | undefined): Promise<string | null> {
+  // AI-GEN-BEGIN
   if (!file || typeof file === "string" || file.size === 0) return null;
+  if (file.size > MAX_COVER_BYTES) {
+    throw new Error("封面不能超过 2MB（控制 R2 免费额度）");
+  }
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
   const key = `covers/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   await env.MEDIA.put(key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type || "application/octet-stream" },
   });
   return `/media/${key}`;
+  // AI-GEN-END
 }
 
 function parseCategoryId(raw: unknown): number | null {
@@ -194,6 +220,12 @@ function parseCategoryId(raw: unknown): number | null {
 }
 
 app.get("/media/*", async (c) => {
+  // AI-GEN-BEGIN
+  const cache = caches.default;
+  const cacheKey = c.req.raw;
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
   const key = c.req.path.replace(/^\/media\//, "");
   const obj = await c.env.MEDIA.get(key);
   if (!obj) return c.notFound();
@@ -201,7 +233,10 @@ app.get("/media/*", async (c) => {
   obj.writeHttpMetadata(headers);
   headers.set("etag", obj.httpEtag);
   headers.set("cache-control", "public, max-age=31536000, immutable");
-  return new Response(obj.body, { headers });
+  const res = new Response(obj.body, { headers });
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+  // AI-GEN-END
 });
 
 app.post("/x/admin/posts", requireAuth, async (c) => {
@@ -426,7 +461,7 @@ app.notFound(async (c) => {
     const s = await settings(c);
     return c.html(notFoundPage(c.env.SITE_NAME, s), 404);
   }
-  return serveSiteNotFound(c.env.SITE);
+  return serveSiteNotFound(c.env.SITE, edgeCacheCtx(c));
 });
 
 export default app;

@@ -100,3 +100,4 @@ cms/
 
 - 切勿把 Cloudflare / 后台密码发到聊天或提交进 Git
 - 生产务必设置强 `AUTH_SECRET`，并修改默认管理员密码
+- **尽量 $0**：见 [`docs/zero-cost.md`](docs/zero-cost.md)（Workers 保持 Free、勿开付费增值）
