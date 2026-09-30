@@ -11,8 +11,8 @@ SITE_URL = "https://beyondany.com"
 [[d1_databases]]
 binding = "DB"
 database_name = "cms-db"
-database_id = "local-dev-placeholder"
-preview_database_id = "local-dev-placeholder"
+database_id = "d6471bb1-479d-40de-b7a1-911e0fc3829c"
+preview_database_id = "d6471bb1-479d-40de-b7a1-911e0fc3829c"
 
 [[r2_buckets]]
 binding = "MEDIA"
@@ -22,3 +22,11 @@ preview_bucket_name = "cms-media"
 [assets]
 directory = "public"
 binding = "ASSETS"
+
+[[routes]]
+pattern = "beyondany.com"
+custom_domain = true
+
+[[routes]]
+pattern = "www.beyondany.com"
+custom_domain = true
