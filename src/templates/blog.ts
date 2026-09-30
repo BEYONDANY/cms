@@ -11,7 +11,7 @@ function formatDate(iso: string | null): string {
 export function homePage(siteName: string, posts: Post[]): string {
   const list =
     posts.length === 0
-      ? `<p class="muted">暂无文章。登录后台发布第一篇吧。</p>`
+      ? `<p class="muted">暂无文章。</p>`
       : `<ul class="post-list">
         ${posts
           .map(
@@ -27,7 +27,7 @@ export function homePage(siteName: string, posts: Post[]): string {
       </ul>`;
 
   return layout({
-    title: "首页",
+    title: siteName,
     siteName,
     body: `<section class="hero">
       <h1>${escapeHtml(siteName)}</h1>
@@ -61,7 +61,7 @@ export function notFoundPage(siteName: string): string {
   return layout({
     title: "未找到",
     siteName,
-    body: `<section class="empty"><h1>404</h1><p>页面不存在。</p><p><a href="/">返回首页</a></p></section>`,
+    body: `<section class="empty"><h1>404</h1><p>页面不存在。</p><p><a href="/">返回</a></p></section>`,
   });
 }
 // AI-GEN-END

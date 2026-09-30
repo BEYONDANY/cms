@@ -45,7 +45,7 @@ async function requireAuth(c: any, next: () => Promise<void>) {
   const secret = authSecret(c.env.AUTH_SECRET);
   const session = token ? await verifySessionToken(token, secret) : null;
   if (!session) {
-    return c.redirect("/admin/login");
+    return c.redirect("/x/admin/login");
   }
   c.set("session", session);
   await next();
@@ -75,16 +75,16 @@ app.get("/post/:slug", async (c) => {
   return c.html(postPage(c.env.SITE_NAME, post));
 });
 
-app.get("/admin/login", async (c) => {
+app.get("/x/admin/login", async (c) => {
   const token = getCookie(c, COOKIE);
   const secret = authSecret(c.env.AUTH_SECRET);
   if (token && (await verifySessionToken(token, secret))) {
-    return c.redirect("/admin");
+    return c.redirect("/x/admin");
   }
   return c.html(loginPage(c.env.SITE_NAME));
 });
 
-app.post("/admin/login", async (c) => {
+app.post("/x/admin/login", async (c) => {
   const body = await c.req.parseBody();
   const username = String(body.username || "").trim();
   const password = String(body.password || "");
@@ -104,26 +104,26 @@ app.post("/admin/login", async (c) => {
     secure: new URL(c.req.url).protocol === "https:",
     maxAge: 60 * 60 * 24 * 7,
   });
-  return c.redirect("/admin");
+  return c.redirect("/x/admin");
 });
 
-app.post("/admin/logout", requireAuth, async (c) => {
+app.post("/x/admin/logout", requireAuth, async (c) => {
   deleteCookie(c, COOKIE, { path: "/" });
-  return c.redirect("/admin/login");
+  return c.redirect("/x/admin/login");
 });
 
-app.get("/admin", requireAuth, async (c) => {
+app.get("/x/admin", requireAuth, async (c) => {
   const session = c.get("session");
   const posts = await listAllPosts(c.env.DB);
   return c.html(dashboardPage(c.env.SITE_NAME, session.username, posts));
 });
 
-app.get("/admin/posts/new", requireAuth, async (c) => {
+app.get("/x/admin/posts/new", requireAuth, async (c) => {
   const session = c.get("session");
   return c.html(editorPage(c.env.SITE_NAME, session.username, null));
 });
 
-app.get("/admin/posts/:id", requireAuth, async (c) => {
+app.get("/x/admin/posts/:id", requireAuth, async (c) => {
   const session = c.get("session");
   const id = Number(c.req.param("id"));
   const post = await getPostById(c.env.DB, id);
@@ -152,7 +152,7 @@ app.get("/media/*", async (c) => {
   return new Response(obj.body, { headers });
 });
 
-app.post("/admin/posts", requireAuth, async (c) => {
+app.post("/x/admin/posts", requireAuth, async (c) => {
   const session = c.get("session");
   const body = await c.req.parseBody();
   const title = String(body.title || "").trim();
@@ -181,14 +181,14 @@ app.post("/admin/posts", requireAuth, async (c) => {
       cover_url,
       status,
     });
-    return c.redirect(`/admin/posts/${id}`);
+    return c.redirect(`/x/admin/posts/${id}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
     return c.html(editorPage(c.env.SITE_NAME, session.username, null, msg), 400);
   }
 });
 
-app.post("/admin/posts/:id", requireAuth, async (c) => {
+app.post("/x/admin/posts/:id", requireAuth, async (c) => {
   const session = c.get("session");
   const id = Number(c.req.param("id"));
   const existing = await getPostById(c.env.DB, id);
@@ -214,7 +214,7 @@ app.post("/admin/posts/:id", requireAuth, async (c) => {
       cover_url,
       status,
     });
-    return c.redirect(`/admin/posts/${id}`);
+    return c.redirect(`/x/admin/posts/${id}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "保存失败";
     return c.html(
@@ -224,18 +224,18 @@ app.post("/admin/posts/:id", requireAuth, async (c) => {
   }
 });
 
-app.post("/admin/posts/:id/delete", requireAuth, async (c) => {
+app.post("/x/admin/posts/:id/delete", requireAuth, async (c) => {
   const id = Number(c.req.param("id"));
   await deletePost(c.env.DB, id);
-  return c.redirect("/admin");
+  return c.redirect("/x/admin");
 });
 
-app.get("/admin/password", requireAuth, async (c) => {
+app.get("/x/admin/password", requireAuth, async (c) => {
   const session = c.get("session");
   return c.html(passwordPage(c.env.SITE_NAME, session.username));
 });
 
-app.post("/admin/password", requireAuth, async (c) => {
+app.post("/x/admin/password", requireAuth, async (c) => {
   const session = c.get("session");
   const body = await c.req.parseBody();
   const current = String(body.current || "");
