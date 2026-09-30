@@ -1,7 +1,7 @@
 // AI-GEN-BEGIN
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import type { Env, SessionPayload, SiteSettings } from "./types";
+import type { Env, HomeBanner, SessionPayload, SiteSettings } from "./types";
 import {
   authSecret,
   createSessionToken,
@@ -23,6 +23,7 @@ import {
   listAllPosts,
   listCategories,
   reorderPosts,
+  saveHomeBanners,
   setPostStatus,
   setSetting,
   updateCategory,
@@ -87,6 +88,8 @@ async function settings(c: { env: Env }): Promise<SiteSettings> {
       weather_effect: "overcast",
       cursor_effect: "whirlwind",
       click_effect: "water",
+      home_banners: [],
+      home_footer_tagline: "记录所见所想",
     };
   }
 }
@@ -591,6 +594,7 @@ app.post("/x/admin/settings", requireAuth, async (c) => {
   const weather = String(body.weather_effect || "none");
   const cursor = String(body.cursor_effect || "none");
   const click = String(body.click_effect || "none");
+  const footerTagline = String(body.home_footer_tagline || "").trim().slice(0, 120);
   const weatherOk = ["none", "snow", "rain", "overcast", "fog", "wind"].includes(weather);
   const cursorOk = ["none", "whirlwind", "animal"].includes(cursor);
   const clickOk = ["none", "water", "boom", "glass", "nuke"].includes(click);
@@ -599,16 +603,125 @@ app.post("/x/admin/settings", requireAuth, async (c) => {
   await setSetting(c.env.DB, "weather_effect", weatherOk ? weather : "none");
   await setSetting(c.env.DB, "cursor_effect", cursorOk ? cursor : "none");
   await setSetting(c.env.DB, "click_effect", clickOk ? click : "none");
+  await setSetting(c.env.DB, "home_footer_tagline", footerTagline || "记录所见所想");
 
-  // 外观改动立即刷新静态站，避免前台仍是旧特效配置
-  try {
-    await generateSite(c.env);
-  } catch {
-    // 生成失败不阻断保存
-  }
+  await maybeRebuildSite(c.env);
 
   const s = await settings(c);
   return c.html(settingsPage(c.env.SITE_NAME, session.username, s, "设置已保存并已更新静态站"));
+});
+
+const MAX_BANNER_BYTES = 2 * 1024 * 1024;
+
+async function uploadBanner(env: Env, file: File | undefined): Promise<string> {
+  // AI-GEN-BEGIN
+  if (!file || typeof file === "string" || file.size === 0) {
+    throw new Error("请选择图片");
+  }
+  if (file.size > MAX_BANNER_BYTES) {
+    throw new Error("轮播图不能超过 2MB");
+  }
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const key = `banners/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  await env.MEDIA.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: file.type || "application/octet-stream" },
+  });
+  return `/media/${key}`;
+  // AI-GEN-END
+}
+
+async function withBanners(
+  env: Env,
+  mutate: (list: HomeBanner[]) => HomeBanner[] | void
+): Promise<void> {
+  const s = await getSiteSettings(env.DB);
+  const next = mutate([...s.home_banners]) || s.home_banners;
+  await saveHomeBanners(env.DB, next);
+  await maybeRebuildSite(env);
+}
+
+app.post("/x/admin/banners", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const session = c.get("session");
+  try {
+    const body = await c.req.parseBody();
+    const url = await uploadBanner(c.env, body.file as File | undefined);
+    const banner: HomeBanner = {
+      id: crypto.randomUUID().slice(0, 8),
+      url,
+      title: String(body.title || "").trim().slice(0, 80),
+      link: String(body.link || "").trim().slice(0, 300),
+    };
+    await withBanners(c.env, (list) => {
+      list.push(banner);
+      return list;
+    });
+    const s = await settings(c);
+    return c.html(
+      settingsPage(c.env.SITE_NAME, session.username, s, "轮播图已添加并更新静态站")
+    );
+  } catch (e) {
+    const s = await settings(c);
+    const msg = e instanceof Error ? e.message : "添加失败";
+    return c.html(settingsPage(c.env.SITE_NAME, session.username, s, msg), 400);
+  }
+  // AI-GEN-END
+});
+
+app.post("/x/admin/banners/:id", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const id = c.req.param("id");
+  const body = await c.req.parseBody();
+  await withBanners(c.env, (list) => {
+    const item = list.find((b) => b.id === id);
+    if (item) {
+      item.title = String(body.title || "").trim().slice(0, 80);
+      item.link = String(body.link || "").trim().slice(0, 300);
+    }
+    return list;
+  });
+  return c.redirect("/x/admin/settings");
+  // AI-GEN-END
+});
+
+app.post("/x/admin/banners/:id/delete", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const id = c.req.param("id");
+  await withBanners(c.env, (list) => list.filter((b) => b.id !== id));
+  return c.redirect("/x/admin/settings");
+  // AI-GEN-END
+});
+
+app.post("/x/admin/banners/:id/up", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const id = c.req.param("id");
+  await withBanners(c.env, (list) => {
+    const i = list.findIndex((b) => b.id === id);
+    if (i > 0) {
+      const tmp = list[i - 1];
+      list[i - 1] = list[i];
+      list[i] = tmp;
+    }
+    return list;
+  });
+  return c.redirect("/x/admin/settings");
+  // AI-GEN-END
+});
+
+app.post("/x/admin/banners/:id/down", requireAuth, async (c) => {
+  // AI-GEN-BEGIN
+  const id = c.req.param("id");
+  await withBanners(c.env, (list) => {
+    const i = list.findIndex((b) => b.id === id);
+    if (i >= 0 && i < list.length - 1) {
+      const tmp = list[i + 1];
+      list[i + 1] = list[i];
+      list[i] = tmp;
+    }
+    return list;
+  });
+  return c.redirect("/x/admin/settings");
+  // AI-GEN-END
 });
 
 app.get("/x/admin/password", requireAuth, async (c) => {

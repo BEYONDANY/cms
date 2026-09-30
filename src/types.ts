@@ -58,11 +58,22 @@ export type SessionPayload = {
   exp: number;
 };
 
+export type HomeBanner = {
+  id: string;
+  url: string;
+  title: string;
+  link: string;
+};
+
 export type SiteSettings = {
   ui_theme: string;
   weather_effect: string;
   cursor_effect: string;
   click_effect: string;
+  /** 首页大图轮播（仅首页） */
+  home_banners: HomeBanner[];
+  /** 首页页脚简介 */
+  home_footer_tagline: string;
 };
 
 export type WeatherEffect =

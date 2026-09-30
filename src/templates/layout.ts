@@ -1,6 +1,68 @@
 // AI-GEN-BEGIN
 import { escapeHtml } from "../utils";
-import type { SiteSettings } from "../types";
+import type { Category, HomeBanner, SiteSettings } from "../types";
+
+function homeBannerHtml(banners: HomeBanner[], siteName: string): string {
+  if (banners.length === 0) return "";
+  const slides = banners
+    .map((b, i) => {
+      const inner = `<div class="home-banner-bg" style="background-image:url('${escapeHtml(b.url)}')"></div>
+        <div class="home-banner-caption">
+          <p class="home-banner-brand">${escapeHtml(siteName)}</p>
+          ${b.title ? `<h2>${escapeHtml(b.title)}</h2>` : ""}
+        </div>`;
+      return b.link
+        ? `<a class="home-banner-slide${i === 0 ? " is-active" : ""}" href="${escapeHtml(b.link)}" data-index="${i}">${inner}</a>`
+        : `<div class="home-banner-slide${i === 0 ? " is-active" : ""}" data-index="${i}">${inner}</div>`;
+    })
+    .join("");
+  const dots =
+    banners.length > 1
+      ? `<div class="home-banner-dots" role="tablist">
+        ${banners
+          .map(
+            (_, i) =>
+              `<button type="button" class="home-banner-dot${i === 0 ? " is-active" : ""}" data-index="${i}" aria-label="第 ${i + 1} 张"></button>`
+          )
+          .join("")}
+      </div>`
+      : "";
+  const arrows =
+    banners.length > 1
+      ? `<button type="button" class="home-banner-prev" aria-label="上一张">‹</button>
+         <button type="button" class="home-banner-next" aria-label="下一张">›</button>`
+      : "";
+  return `<section class="home-banner" id="home-banner" data-interval="5000" aria-label="首页轮播">
+    <div class="home-banner-track">${slides}</div>
+    ${arrows}
+    ${dots}
+  </section>`;
+}
+
+function homeNavHtml(categories: Category[]): string {
+  const cats = categories
+    .slice(0, 8)
+    .map(
+      (c) =>
+        `<a href="/category/${escapeHtml(c.slug)}">${escapeHtml(c.name)}</a>`
+    )
+    .join("");
+  return `<nav class="nav home-nav">
+    <a class="is-active" href="/">首页</a>
+    ${cats}
+  </nav>`;
+}
+
+function homeFooterHtml(siteName: string, tagline: string): string {
+  const year = new Date().getUTCFullYear();
+  return `<footer class="site-footer site-footer--home">
+    <div class="wrap wrap--home footer-home">
+      <div class="footer-home-brand">${escapeHtml(siteName)}</div>
+      ${tagline ? `<p class="footer-home-tagline">${escapeHtml(tagline)}</p>` : ""}
+      <p class="footer-home-copy">© ${year} ${escapeHtml(siteName)}</p>
+    </div>
+  </footer>`;
+}
 
 export function layout(opts: {
   title: string;
@@ -11,13 +73,28 @@ export function layout(opts: {
   admin?: boolean;
   headExtra?: string;
   bodyExtra?: string;
+  /** 首页三栏加宽 + 城市组件脚本 */
+  homeWide?: boolean;
+  /** 仅首页：加强头尾 + 大图轮播 */
+  homeShell?: {
+    categories: Category[];
+    banners: HomeBanner[];
+    footerTagline: string;
+  };
 }): string {
+  const isHome = (!!opts.homeShell || !!opts.homeWide) && !opts.admin;
+  const homeShell = opts.homeShell;
+  const homeWide = !!opts.homeWide && !opts.admin;
   const nav = opts.nav ?? "";
   const title =
     opts.title === opts.siteName
       ? escapeHtml(opts.siteName)
       : `${escapeHtml(opts.title)} · ${escapeHtml(opts.siteName)}`;
-  const navHtml = nav.trim() ? `<nav class="nav">${nav}</nav>` : "";
+  const navHtml = homeShell
+    ? homeNavHtml(homeShell.categories)
+    : nav.trim()
+      ? `<nav class="nav">${nav}</nav>`
+      : "";
   const theme = opts.settings?.ui_theme || "leuc";
   const weather = opts.settings?.weather_effect || "none";
   const cursor = opts.settings?.cursor_effect || "none";
@@ -27,6 +104,22 @@ export function layout(opts: {
     : ` data-weather="${escapeHtml(weather)}" data-cursor="${escapeHtml(cursor)}" data-click="${escapeHtml(click)}"`;
   const headExtra = opts.headExtra || "";
   const bodyExtra = opts.bodyExtra || "";
+  const banner = homeShell
+    ? homeBannerHtml(homeShell.banners, opts.siteName)
+    : "";
+  const footer = homeShell
+    ? homeFooterHtml(opts.siteName, homeShell.footerTagline)
+    : `<footer class="site-footer">
+    <div class="wrap${homeWide ? " wrap--home" : ""}">BeyondAny</div>
+  </footer>`;
+  const bannerScript =
+    homeShell && homeShell.banners.length > 1
+      ? `<script src="/static/banner.js" defer></script>`
+      : "";
+  const cityScript = homeWide
+    ? `<script src="/static/city-widgets.js" defer></script>`
+    : "";
+  const wrapCls = homeWide ? "wrap wrap--home" : "wrap";
 
   return `<!DOCTYPE html>
 <html lang="zh-CN" data-theme="${escapeHtml(theme)}">
@@ -40,19 +133,20 @@ export function layout(opts: {
   <link rel="stylesheet" href="/static/style.css" />
   ${headExtra}
 </head>
-<body${fxAttrs}>
+<body${fxAttrs}${isHome ? ' class="page-home"' : ""}>
   <div id="fx-layer" aria-hidden="true"></div>
-  <header class="site-header">
-    <div class="wrap header-inner">
+  <header class="site-header${homeShell ? " site-header--home" : ""}">
+    <div class="${wrapCls} header-inner">
       <a class="brand" href="/">${escapeHtml(opts.siteName)}</a>
       ${navHtml}
     </div>
   </header>
-  <main class="wrap">${opts.body}</main>
-  <footer class="site-footer">
-    <div class="wrap">BeyondAny</div>
-  </footer>
+  ${banner}
+  <main class="${wrapCls}">${opts.body}</main>
+  ${footer}
   ${opts.admin ? "" : `<script src="/static/effects.js" defer></script>`}
+  ${bannerScript}
+  ${cityScript}
   ${bodyExtra}
 </body>
 </html>`;

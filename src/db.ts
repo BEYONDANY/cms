@@ -1,7 +1,38 @@
 // AI-GEN-BEGIN
-import type { Category, Env, Post, SiteSettings, User } from "./types";
+import type {
+  Category,
+  Env,
+  HomeBanner,
+  Post,
+  SiteSettings,
+  User,
+} from "./types";
 import { hashPassword } from "./auth";
 import { normalizeTheme } from "./themes";
+
+export function parseHomeBanners(raw: string | undefined | null): HomeBanner[] {
+  if (!raw) return [];
+  try {
+    const data = JSON.parse(raw) as unknown;
+    if (!Array.isArray(data)) return [];
+    return data
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const o = item as Record<string, unknown>;
+        const url = String(o.url || "").trim();
+        if (!url) return null;
+        return {
+          id: String(o.id || crypto.randomUUID()),
+          url,
+          title: String(o.title || "").trim(),
+          link: String(o.link || "").trim(),
+        };
+      })
+      .filter((x): x is HomeBanner => !!x);
+  } catch {
+    return [];
+  }
+}
 
 export async function ensureBootstrap(env: Env): Promise<void> {
   const row = await env.DB.prepare(
@@ -39,6 +70,8 @@ async function ensureDefaultSettings(db: D1Database): Promise<void> {
     ["weather_effect", "overcast"],
     ["cursor_effect", "whirlwind"],
     ["click_effect", "water"],
+    ["home_banners", "[]"],
+    ["home_footer_tagline", "记录所见所想"],
   ];
   for (const [key, value] of defaults) {
     await db
@@ -54,6 +87,8 @@ export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
     "weather_effect",
     "cursor_effect",
     "click_effect",
+    "home_banners",
+    "home_footer_tagline",
   ];
   const map: Record<string, string> = {};
   for (const key of keys) {
@@ -68,7 +103,16 @@ export async function getSiteSettings(db: D1Database): Promise<SiteSettings> {
     weather_effect: map.weather_effect || "overcast",
     cursor_effect: map.cursor_effect || "whirlwind",
     click_effect: map.click_effect || "water",
+    home_banners: parseHomeBanners(map.home_banners),
+    home_footer_tagline: map.home_footer_tagline || "记录所见所想",
   };
+}
+
+export async function saveHomeBanners(
+  db: D1Database,
+  banners: HomeBanner[]
+): Promise<void> {
+  await setSetting(db, "home_banners", JSON.stringify(banners));
 }
 
 export async function getSetting(

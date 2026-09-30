@@ -94,19 +94,50 @@ export function homePage(
           .join("")}
       </div>`;
 
+  const isHome = activeCategory == null;
   const subtitle = activeCategory
     ? `分类 · ${escapeHtml(activeCategory.name)}`
     : "封面天梯 · 时间轴";
+
+  // 首页有轮播时不再叠大标题区，避免抢视觉；无轮播则保留文字 hero
+  const hero =
+    isHome && settings.home_banners.length > 0
+      ? ""
+      : `<section class="hero hero-cover">
+      <p class="eyebrow">${subtitle}</p>
+      <h1>${escapeHtml(activeCategory ? activeCategory.name : siteName)}</h1>
+    </section>`;
 
   return layout({
     title: activeCategory ? activeCategory.name : siteName,
     siteName,
     settings,
-    body: `<section class="hero hero-cover">
-      <p class="eyebrow">${subtitle}</p>
-      <h1>${escapeHtml(siteName)}</h1>
-    </section>
-    ${categoryNav(categories, activeCategory?.slug ?? null)}
+    homeWide: isHome,
+    homeShell: isHome
+      ? {
+          categories,
+          banners: settings.home_banners || [],
+          footerTagline: settings.home_footer_tagline || "",
+        }
+      : undefined,
+    body: isHome
+      ? `<!-- AI-GEN-BEGIN -->
+    <div class="home-layout">
+      <aside class="city-panel" id="bj-weather" aria-label="北京天气">
+        <div class="city-panel-head"><h3>北京天气</h3><p class="muted">加载中…</p></div>
+      </aside>
+      <div class="home-main">
+        ${hero}
+        ${categoryNav(categories, null)}
+        <section class="ladder-section">${ladder}</section>
+      </div>
+      <aside class="city-panel" id="bj-plate" aria-label="北京尾号限行">
+        <div class="city-panel-head"><h3>北京尾号限行</h3><p class="muted">计算中…</p></div>
+      </aside>
+    </div>
+    <!-- AI-GEN-END -->`
+      : `${hero}
+    ${categoryNav(categories, activeCategory ? activeCategory.slug : null)}
     <section class="ladder-section">${ladder}</section>`,
   });
 }

@@ -372,6 +372,41 @@ export function settingsPage(
       `<option value="${o.id}" ${settings.click_effect === o.id ? "selected" : ""}>${o.name}</option>`
   ).join("");
 
+  const banners = settings.home_banners || [];
+  const bannerRows =
+    banners.length === 0
+      ? `<p class="muted">还没有轮播图，请在下方添加。</p>`
+      : `<div class="banner-admin-list">${banners
+          .map(
+            (b, i) => `<div class="banner-admin-item">
+          <div class="banner-admin-thumb" style="background-image:url('${escapeHtml(b.url)}')"></div>
+          <div class="stack" style="gap:0.45rem">
+            <strong>#${i + 1}</strong>
+            <form method="post" action="/x/admin/banners/${escapeHtml(b.id)}" class="stack" style="gap:0.45rem">
+              <label>标题<input name="title" value="${escapeHtml(b.title)}" placeholder="可选" /></label>
+              <label>跳转链接<input name="link" value="${escapeHtml(b.link)}" placeholder="/post/slug 或 https://..." /></label>
+              <div class="row">
+                <button type="submit">更新</button>
+                ${
+                  i > 0
+                    ? `<button formaction="/x/admin/banners/${escapeHtml(b.id)}/up" formmethod="post" type="submit" class="secondary">上移</button>`
+                    : ""
+                }
+                ${
+                  i < banners.length - 1
+                    ? `<button formaction="/x/admin/banners/${escapeHtml(b.id)}/down" formmethod="post" type="submit" class="secondary">下移</button>`
+                    : ""
+                }
+              </div>
+            </form>
+          </div>
+          <form method="post" action="/x/admin/banners/${escapeHtml(b.id)}/delete" onsubmit="return confirm('删除这张轮播图？')">
+            <button type="submit" class="danger linkish">删除</button>
+          </form>
+        </div>`
+          )
+          .join("")}</div>`;
+
   return adminLayout({
     title: "外观设置",
     siteName,
@@ -380,10 +415,10 @@ export function settingsPage(
     body: `<section>
       <div class="toolbar"><h1>外观与特效</h1></div>
       ${message ? `<p class="ok">${escapeHtml(message)}</p>` : ""}
-      <form method="post" action="/x/admin/settings" class="stack">
+      <form method="post" action="/x/admin/settings" class="stack" id="settings-form">
         <div class="card">
           <h2 class="subhead">选择界面主题</h2>
-          <p class="muted tip">对齐 LEUC 12 套主题气质，即时作用于前台与后台。</p>
+          <p class="muted tip">点击卡片即时预览整页风格；保存后同步前台静态站。</p>
           <div class="theme-grid">${themeCards}</div>
         </div>
         <div class="card">
@@ -398,12 +433,55 @@ export function settingsPage(
             <select name="click_effect">${clickOpts}</select>
           </label>
         </div>
+        <div class="card">
+          <h2 class="subhead">首页页脚文案</h2>
+          <label>简介（仅首页底部）
+            <input name="home_footer_tagline" value="${escapeHtml(settings.home_footer_tagline || "")}" placeholder="记录所见所想" />
+          </label>
+        </div>
         <div class="row">
           <button type="submit">保存设置</button>
           <a class="btn ghost" href="/" target="_blank" rel="noopener">预览前台</a>
         </div>
       </form>
+      <div class="card" style="margin-top:1.25rem">
+        <h2 class="subhead">首页大图轮播</h2>
+        <p class="muted tip">仅首页全宽展示；多图自动轮播。单张 ≤2MB。</p>
+        ${bannerRows}
+        <form method="post" action="/x/admin/banners" class="stack" enctype="multipart/form-data" style="margin-top:1rem">
+          <label>上传图片<input type="file" name="file" accept="image/*" required /></label>
+          <label>标题（可选）<input name="title" placeholder="叠在图上的短标题" /></label>
+          <label>跳转链接（可选）<input name="link" placeholder="/post/slug 或 https://..." /></label>
+          <button type="submit">添加轮播图</button>
+        </form>
+      </div>
     </section>`,
+    bodyExtra: `<script>
+// AI-GEN-BEGIN
+(function () {
+  function applyTheme(id) {
+    if (!id) return;
+    document.documentElement.setAttribute("data-theme", id);
+    document.querySelectorAll(".theme-card").forEach(function (card) {
+      var input = card.querySelector('input[name="ui_theme"]');
+      var on = input && input.value === id;
+      card.classList.toggle("active", !!on);
+      if (input) input.checked = !!on;
+    });
+  }
+  document.querySelectorAll('.theme-card input[name="ui_theme"]').forEach(function (input) {
+    input.addEventListener("change", function () {
+      applyTheme(input.value);
+    });
+    input.addEventListener("click", function () {
+      applyTheme(input.value);
+    });
+  });
+  var checked = document.querySelector('.theme-card input[name="ui_theme"]:checked');
+  if (checked) applyTheme(checked.value);
+})();
+// AI-GEN-END
+</script>`,
   });
 }
 
